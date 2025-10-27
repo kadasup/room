@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一斗夢包棟民宿 | 空房表（前台）</title>
+  <style>
+    :root{
+      --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
+      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fffbe6; --border:#dcdcdc; --sticky:#ffffffee;
+    }
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:16px;background:var(--bg);color:var(--fg)}
+    .wrap{max-width:1100px;margin:0 auto}
+    h1{font-size:20px;margin:6px 0 10px;text-align:center}
+
+    .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:8px 0 12px}
+    .nav{display:flex;gap:8px}
+    button{padding:8px 12px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
+    button:hover{background:var(--brand-600)}
+    .secondary{background:#e9eefb;color:#0f2d62}
+
+    .legend{display:flex;gap:12px;align-items:center;font-size:13px;color:#444;margin:0 0 10px}
+    .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
+
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    .cal-head{display:flex;justify-content:center;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:1;font-weight:700}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    th,td{border:1px solid var(--border);text-align:center;padding:8px;vertical-align:top}
+    thead th{background:var(--sticky)}
+    td.day{height:92px;position:relative}
+    .num{position:absolute;top:6px;left:8px;font-size:13px;color:#444}
+    .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
+    .available{background:var(--ok)}
+    .full{background:var(--bad)}
+
+    /* 週末紅字＋淡紅底 */
+    .redday{ background: var(--redbg); }
+    .redday .num{ color: var(--redtxt); font-weight:700 }
+    /* 今日樣式：淡黃底 + 右上紅點 */
+    .today{ background: var(--today); border:2px solid #faad14; box-shadow:none }
+    td.day.today::after{ content:''; position:absolute; top:6px; right:6px; width:8px; height:8px; background:#d9363e; border-radius:50%; }
+
+    .muted-text{color:#aaa}
+    /* 過去日期灰階且不可點 */
+    .past{ background:#f1f3f5; cursor:not-allowed }
+    .past .num{ color:#9aa0a6 }
+    .past .badge{ opacity:.6 }
+
+    .help{color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
+
+    /* Mobile 單列優化 */
+    @media (max-width: 640px){
+      body{margin:10px}
+      .grid{grid-template-columns:1fr}
+      th,td{padding:6px}
+      td.day{height:74px}
+      .num{font-size:14px}
+      .badge{font-size:12px; padding:4px 8px; bottom:6px}
+      .toolbar{flex-direction:column;align-items:stretch}
+      .nav{justify-content:space-between}
+      button{width:100%}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>一斗夢包棟民宿｜空房表（前台）</h1>
+    <div class="toolbar">
+      <div class="nav">
+        <button id="prev3" class="secondary">◀︎ 上三個月</button>
+        <button id="next3" class="secondary">下三個月 ▶︎</button>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--ok)"></span>可訂</span>
+        <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
+        <span><span class="dot" style="background:var(--redbg); border-color:#f4b4b4"></span>週末</span>
+      </div>
+    </div>
+
+    <div id="calendars" class="grid" aria-label="三個月月曆（唯讀）"></div>
+    <p class="help">點選「可訂」日期即可直接撥打：<a href="tel:0905385388">0905-385388</a>（單日預訂）。</p>
+  </div>
+
+  <script>
+    // ===== 設定（若改為 API 讀取，調整 getSaved 即可） =====
+    const TEL = '0905385388';
+    const LABEL = '空房表';
+
+    function storageKey(year){ return `vacancy-calendar-${year}`; }
+    function getSaved(year){ try{ const data=localStorage.getItem(storageKey(year)); return data? JSON.parse(data): {}; }catch(e){ return {}; } }
+
+    // 日期工具
+    function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
+    function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
+    function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
+    function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
+    function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
+
+    function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
+
+    // 狀態：full / available；未知視為 available（和後台一致）
+    function getState(year,dateStr){ const s=getSaved(year); return s[dateStr]==='full' ? 'full' : 'available'; }
+
+    // 目前視窗的起始月份（預設當月第一天）
+    let base = startOfMonth(new Date());
+
+    function render(){
+      const holder=document.getElementById('calendars');
+      holder.innerHTML='';
+      const todayStr = ymd(new Date());
+
+      for(let m=0;m<3;m++){
+        const mStart = addMonths(base,m);
+        const mEnd = endOfMonth(mStart);
+        const lead = mStart.getDay();
+        const days = rangeDays(mStart,mEnd);
+        const year = mStart.getFullYear();
+
+        const cal=document.createElement('div'); cal.className='calendar';
+        cal.innerHTML=`<div class="cal-head">${mStart.getFullYear()} 年 ${mStart.getMonth()+1} 月｜${LABEL}</div>`;
+
+        const tbl=document.createElement('table');
+        const thead=document.createElement('thead');
+        const trh=document.createElement('tr');
+        '日,一,二,三,四,五,六'.split(',').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; trh.appendChild(th); });
+        thead.appendChild(trh); tbl.appendChild(thead);
+
+        const tbody=document.createElement('tbody');
+        let tr=document.createElement('tr');
+        for(let i=0;i<lead;i++){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td); }
+
+        days.forEach((d,idx)=>{
+          const td=document.createElement('td'); td.className='day';
+          const ds=ymd(d);
+          const isPast = ds < todayStr;
+          const weekend = isWeekend(d);
+          if(weekend) td.classList.add('redday');
+          if(ds === todayStr) td.classList.add('today');
+          if(isPast) td.classList.add('past');
+
+          const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate();
+          td.appendChild(num);
+
+          if(!isPast){
+            const st=getState(year, ds);
+            const badge=document.createElement('div');
+            badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可訂');
+            if(st==='available'){
+              badge.style.cursor='pointer';
+              badge.title=`撥打 ${TEL}`;
+              badge.onclick=(e)=>{ e.stopPropagation(); window.location.href=`tel:${TEL}`; };
+              // 也讓整個可訂日期可點（但保留 a11y/title 在 badge 上）
+              td.style.cursor='pointer';
+              td.onclick=()=>{ window.location.href=`tel:${TEL}`; };
+            }
+            td.appendChild(badge);
+          }
+
+          tr.appendChild(td);
+          const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
+        });
+        if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td);} tbody.appendChild(tr); }
+        tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
+      }
+    }
+
+    function shiftMonths(n){ base = addMonths(base,n); render(); }
+
+    document.getElementById('prev3').onclick=()=>shiftMonths(-3);
+    document.getElementById('next3').onclick=()=>shiftMonths(3);
+
+    // 鍵盤 ← / → 切月（-1 / +1）
+    document.addEventListener('keydown', (e)=>{
+      const tag=(e.target && e.target.tagName)||'';
+      if(tag==='INPUT' || tag==='TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if(e.key==='ArrowLeft'){ e.preventDefault(); shiftMonths(-1); }
+      if(e.key==='ArrowRight'){ e.preventDefault(); shiftMonths(1); }
+    });
+
+    // 手機滑動：左右切換月份
+    (function enableSwipe(){
+      const area=document.getElementById('calendars');
+      let sx=0, sy=0, moving=false;
+      const THRESH_X=60, THRESH_Y=50;
+      area.addEventListener('touchstart', (e)=>{
+        if(!e.touches || e.touches.length===0) return;
+        const t=e.touches[0]; sx=t.clientX; sy=t.clientY; moving=true;
+      }, {passive:true});
+      area.addEventListener('touchend', (e)=>{
+        if(!moving) return; moving=false;
+        if(!e.changedTouches || e.changedTouches.length===0) return;
+        const t=e.changedTouches[0]; const dx=t.clientX - sx; const dy=t.clientY - sy;
+        if(Math.abs(dx) > THRESH_X && Math.abs(dy) < THRESH_Y){
+          if(dx < 0) shiftMonths(1); else shiftMonths(-1);
+        }
+      }, {passive:true});
+    })();
+
+    render();
+  </script>
+</body>
+</html>
