@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表（前台）</title>
+  <title>一斗夢包棟民宿 | 空房表（前台｜API）</title>
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
       --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fffbe6; --border:#dcdcdc; --sticky:#ffffffee;
+      --warn:#fff4e5; --warn-border:#ffcc80;
     }
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:16px;background:var(--bg);color:var(--fg)}
@@ -49,6 +50,7 @@
     .past .badge{ opacity:.6 }
 
     .help{color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
+    .err{background:var(--warn);border:1px solid var(--warn-border);padding:8px 10px;border-radius:10px;color:#7a4a00;font-size:13px}
 
     /* Mobile 單列優化 */
     @media (max-width: 640px){
@@ -66,7 +68,9 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>一斗夢包棟民宿｜空房表（前台）</h1>
+    <h1>一斗夢包棟民宿｜空房表（前台｜API）</h1>
+    <div id="errorBox" class="err" style="display:none"></div>
+
     <div class="toolbar">
       <div class="nav">
         <button id="prev3" class="secondary">◀︎ 上三個月</button>
@@ -80,36 +84,60 @@
     </div>
 
     <div id="calendars" class="grid" aria-label="三個月月曆（唯讀）"></div>
-    <p class="help">點選「可訂」日期即可直接撥打：<a href="tel:0905385388">0905-385388</a>（單日預訂）。</p>
+    <p class="help">點選「可訂」日期即可直接撥打：<a id="telLink" href="tel:0905385388">0905-385388</a>（單日預訂）。</p>
   </div>
 
   <script>
-    // ===== 設定（若改為 API 讀取，調整 getSaved 即可） =====
+    // ====== 可調整參數（請改成你的 API 網址與電話） ======
     const TEL = '0905385388';
+    // 期望後端 GET 參數：?year=YYYY，回傳格式見下方 schema
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbzKqF7-PKC1Hvg3iEQQVORK-JXqLO2rEKX_i97e87-HldSBzJR3r36DEOdNHaYQmibVBQ';
     const LABEL = '空房表';
 
-    function storageKey(year){ return `vacancy-calendar-${year}`; }
-    function getSaved(year){ try{ const data=localStorage.getItem(storageKey(year)); return data? JSON.parse(data): {}; }catch(e){ return {}; } }
+    // ====== 期望的 API JSON Schema ======
+    // {
+    //   "year": 2025,
+    //   "status": { "2025-10-08":"available", "2025-10-11":"full", ... },
+    //   "updatedAt": "2025-10-07T15:32:00Z"
+    // }
 
-    // 日期工具
+    // ====== 工具函式 ======
     function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
     function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
     function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
     function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
     function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
-
     function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
 
-    // 狀態：full / available；未知視為 available（和後台一致）
-    function getState(year,dateStr){ const s=getSaved(year); return s[dateStr]==='full' ? 'full' : 'available'; }
+    // ====== API ======
+    async function fetchAvailability(year, {signal}={}){
+      const u = new URL(API_BASE);
+      u.searchParams.set('year', String(year));
+      const res = await fetch(u.toString(), { signal, headers: { 'Accept':'application/json' } });
+      if(!res.ok) throw new Error('API error: '+res.status);
+      const data = await res.json();
+      // 簡單驗證
+      if(!data || typeof data!== 'object' || !data.status || typeof data.status!=='object'){
+        throw new Error('Invalid JSON shape');
+      }
+      return data;
+    }
 
-    // 目前視窗的起始月份（預設當月第一天）
+    // ====== 狀態讀取（唯讀） ======
+    function getStateFromMap(map, dateStr){ return map[dateStr]==='full' ? 'full' : 'available'; }
+
+    // ====== 畫面邏輯 ======
     let base = startOfMonth(new Date());
+    let cache = { year: new Date().getFullYear(), status: {}, updatedAt: null };
+
+    function showError(msg){ const box=document.getElementById('errorBox'); box.textContent=msg; box.style.display='block'; }
+    function clearError(){ const box=document.getElementById('errorBox'); box.style.display='none'; box.textContent=''; }
 
     function render(){
       const holder=document.getElementById('calendars');
       holder.innerHTML='';
       const todayStr = ymd(new Date());
+      document.getElementById('telLink').href = `tel:${TEL}`;
 
       for(let m=0;m<3;m++){
         const mStart = addMonths(base,m);
@@ -144,14 +172,13 @@
           td.appendChild(num);
 
           if(!isPast){
-            const st=getState(year, ds);
+            const st=getStateFromMap(cache.status, ds);
             const badge=document.createElement('div');
             badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可訂');
             if(st==='available'){
               badge.style.cursor='pointer';
               badge.title=`撥打 ${TEL}`;
               badge.onclick=(e)=>{ e.stopPropagation(); window.location.href=`tel:${TEL}`; };
-              // 也讓整個可訂日期可點（但保留 a11y/title 在 badge 上）
               td.style.cursor='pointer';
               td.onclick=()=>{ window.location.href=`tel:${TEL}`; };
             }
@@ -198,7 +225,23 @@
       }, {passive:true});
     })();
 
-    render();
+    // ====== 啟動：載入 API（預設當年），渲染 ======
+    (async function init(){
+      try{
+        clearError();
+        const y = (new Date()).getFullYear();
+        const ac = new AbortController();
+        const t = setTimeout(()=> ac.abort(), 10000); // 10s 超時
+        const data = await fetchAvailability(y, {signal: ac.signal});
+        clearTimeout(t);
+        cache = { year: data.year||y, status: data.status||{}, updatedAt: data.updatedAt||null };
+      }catch(err){
+        console.error(err);
+        showError('目前無法連線取得最新空房資料，畫面可能不是最新。');
+        cache = { year: (new Date()).getFullYear(), status: {}, updatedAt: null };
+      }
+      render();
+    })();
   </script>
 </body>
 </html>
