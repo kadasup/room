@@ -3,30 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表（前台｜API）</title>
+  <title>一斗夢包棟民宿 | 空房表（前台唯讀）</title>
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fffbe6; --border:#dcdcdc; --sticky:#ffffffee;
-      --warn:#fff4e5; --warn-border:#ffcc80;
+      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fff0f6; --border:#dcdcdc;
+      --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:16px;background:var(--bg);color:var(--fg)}
-    .wrap{max-width:1100px;margin:0 auto}
-    h1{font-size:20px;margin:6px 0 10px;text-align:center}
-
-    .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:8px 0 12px}
-    .nav{display:flex;gap:8px}
-    button{padding:8px 12px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
+    body{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Noto Sans TC\",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
+    h2{margin:6px 0 12px;text-align:center}
+    .wrap{max-width:1200px;margin:0 auto}
+    .controls{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    label{display:flex;gap:8px;align-items:center;color:var(--muted)}
+    input[type=\"month\"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
+    button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
     button:hover{background:var(--brand-600)}
     .secondary{background:#e9eefb;color:#0f2d62}
-
-    .legend{display:flex;gap:12px;align-items:center;font-size:13px;color:#444;margin:0 0 10px}
+    .legend{display:flex;gap:12px;align-items:center;font-size:14px;color:#444;margin:6px 0 14px}
     .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
-
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    .cal-head{display:flex;justify-content:center;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:1;font-weight:700}
+    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:1}
+    .cal-title{font-weight:700}
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{border:1px solid var(--border);text-align:center;padding:8px;vertical-align:top}
     thead th{background:var(--sticky)}
@@ -35,119 +34,90 @@
     .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
     .available{background:var(--ok)}
     .full{background:var(--bad)}
-
-    /* 週末紅字＋淡紅底 */
     .redday{ background: var(--redbg); }
     .redday .num{ color: var(--redtxt); font-weight:700 }
-    /* 今日樣式：淡黃底 + 右上紅點 */
-    .today{ background: var(--today); border:2px solid #faad14; box-shadow:none }
-    td.day.today::after{ content:''; position:absolute; top:6px; right:6px; width:8px; height:8px; background:#d9363e; border-radius:50%; }
-
+    .today{ box-shadow: inset 0 0 0 3px #ff85c0; background: var(--today) }
     .muted-text{color:#aaa}
-    /* 過去日期灰階且不可點 */
-    .past{ background:#f1f3f5; cursor:not-allowed }
-    .past .num{ color:#9aa0a6 }
-    .past .badge{ opacity:.6 }
-
-    .help{color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
-    .err{background:var(--warn);border:1px solid var(--warn-border);padding:8px 10px;border-radius:10px;color:#7a4a00;font-size:13px}
-
-    /* Mobile 單列優化 */
-    @media (max-width: 640px){
-      body{margin:10px}
-      .grid{grid-template-columns:1fr}
-      th,td{padding:6px}
-      td.day{height:74px}
-      .num{font-size:14px}
-      .badge{font-size:12px; padding:4px 8px; bottom:6px}
-      .toolbar{flex-direction:column;align-items:stretch}
-      .nav{justify-content:space-between}
-      button{width:100%}
-    }
+    .counts{font-size:13px;color:#666}
+    .footer{margin-top:10px;color:#666;font-size:12px;text-align:center}
+    .last-updated{ position:fixed; right:12px; bottom:12px; background:#fff; border:1px solid var(--border); color:#666; padding:6px 10px; border-radius:10px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.04) }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>一斗夢包棟民宿｜空房表（前台｜API）</h1>
-    <div id="errorBox" class="err" style="display:none"></div>
+  <div class=\"wrap\">
+    <h2>一斗夢包棟民宿 | 空房表（前台唯讀）</h2>
 
-    <div class="toolbar">
-      <div class="nav">
-        <button id="prev3" class="secondary">◀︎ 上三個月</button>
-        <button id="next3" class="secondary">下三個月 ▶︎</button>
-      </div>
-      <div class="legend">
-        <span><span class="dot" style="background:var(--ok)"></span>可訂</span>
-        <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-        <span><span class="dot" style="background:var(--redbg); border-color:#f4b4b4"></span>週末</span>
-      </div>
+    <div class=\"controls\" role=\"group\" aria-label=\"基本設定\">
+      <label>年份：
+        <select id=\"yearSelect\" title=\"選擇年份\"></select>
+      </label>
+      <label>起始月份：<input type=\"month\" id=\"startMonth\"></label>
+      <button id=\"btnGenerate\">重新產生</button>
+      <button id=\"btnPrev3\" class=\"secondary\" title=\"快速跳到上三個月 (← 也可切月)\">◀︎ 上三個月</button>
+      <button id=\"btnNext3\" class=\"secondary\" title=\"快速跳到下三個月 (→ 也可切月)\">下三個月 ▶︎</button>
+      <span class=\"counts\" id=\"globalCounts\" style=\"justify-self:end\"></span>
     </div>
 
-    <div id="calendars" class="grid" aria-label="三個月月曆（唯讀）"></div>
-    <p class="help">點選「可訂」日期即可直接撥打：<a id="telLink" href="tel:0905385388">0905-385388</a>（單日預訂）。</p>
+    <div class=\"legend\">
+      <span><span class=\"dot\" style=\"background:var(--ok)\"></span>可售</span>
+      <span><span class=\"dot\" style=\"background:var(--bad)\"></span>已滿</span>
+      <span><span class=\"dot\" style=\"background:var(--redbg); border-color:#f4b4b4\"></span>週末（週六/週日）</span>
+      <span><span class=\"dot\" style=\"background:var(--today); box-shadow: inset 0 0 0 2px #ff85c0\"></span>今天</span>
+    </div>
+
+    <div id=\"calendars\" class=\"grid\" aria-label=\"三個月月曆\"></div>
+    <div class=\"last-updated\" id=\"lastUpdated\" aria-live=\"polite\"></div>
+    <p class=\"footer\">此頁為唯讀展示。若需更改房況請至後台。</p>
   </div>
 
   <script>
-    // ====== 可調整參數（請改成你的 API 網址與電話） ======
-    const TEL = '0905385388';
-    // 期望後端 GET 參數：?year=YYYY，回傳格式見下方 schema
     const API_BASE = 'https://script.google.com/macros/s/AKfycbzKqF7-PKC1Hvg3iEQQVORK-JXqLO2rEKX_i97e87-HldSBzJR3r36DEOdNHaYQmibVBQ/exec';
     const LABEL = '空房表';
 
-    // ====== 期望的 API JSON Schema ======
-    // {
-    //   "year": 2025,
-    //   "status": { "2025-10-08":"available", "2025-10-11":"full", ... },
-    //   "updatedAt": "2025-10-07T15:32:00Z"
-    // }
+    const CACHE = {};
 
-    // ====== 工具函式 ======
     function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
     function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
     function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
     function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
     function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function formatDateTime(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+    function setLastUpdatedNow(){ const el=document.getElementById('lastUpdated'); if(el) el.textContent = `上次更新：${formatDateTime(new Date())}`; }
     function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
+    function isRedDay(dateStr){ return isWeekend(new Date(dateStr)); }
+    function weekendName(dateStr){ const d=new Date(dateStr); return d.getDay()===0? '週日' : '週六'; }
+    function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
 
-    // ====== API ======
-    async function fetchAvailability(year, {signal}={}){
+    async function fetchYear(year){
+      if(CACHE[year]) return CACHE[year];
       const u = new URL(API_BASE);
       u.searchParams.set('year', String(year));
-      const res = await fetch(u.toString(), { signal, headers: { 'Accept':'application/json' } });
-      if(!res.ok) throw new Error('API error: '+res.status);
+      const res = await fetch(u.toString(), { headers:{'Accept':'application/json'} });
+      if(!res.ok) throw new Error('API GET failed '+res.status);
       const data = await res.json();
-      // 簡單驗證
-      if(!data || typeof data!== 'object' || !data.status || typeof data.status!=='object'){
-        throw new Error('Invalid JSON shape');
-      }
-      return data;
+      CACHE[year] = data.status || {};
+      return CACHE[year];
     }
 
-    // ====== 狀態讀取（唯讀） ======
-    function getStateFromMap(map, dateStr){ return map[dateStr]==='full' ? 'full' : 'available'; }
-
-    // ====== 畫面邏輯 ======
-    let base = startOfMonth(new Date());
-    let cache = { year: new Date().getFullYear(), status: {}, updatedAt: null };
-
-    function showError(msg){ const box=document.getElementById('errorBox'); box.textContent=msg; box.style.display='block'; }
-    function clearError(){ const box=document.getElementById('errorBox'); box.style.display='none'; box.textContent=''; }
-
-    function render(){
+    function renderCalendars(){
       const holder=document.getElementById('calendars');
       holder.innerHTML='';
+      const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
+      const base = getStartMonthDate();
+      const first = startOfMonth(base);
       const todayStr = ymd(new Date());
-      document.getElementById('telLink').href = `tel:${TEL}`;
+
+      let globalAvail=0, globalFull=0;
 
       for(let m=0;m<3;m++){
-        const mStart = addMonths(base,m);
+        const mStart = addMonths(first,m);
         const mEnd = endOfMonth(mStart);
         const lead = mStart.getDay();
         const days = rangeDays(mStart,mEnd);
-        const year = mStart.getFullYear();
 
         const cal=document.createElement('div'); cal.className='calendar';
-        cal.innerHTML=`<div class="cal-head">${mStart.getFullYear()} 年 ${mStart.getMonth()+1} 月｜${LABEL}</div>`;
+        cal.innerHTML=`<div class=\"cal-head\"><div class=\"cal-title\">${mStart.getFullYear()} 年 ${mStart.getMonth()+1} 月｜${LABEL}</div></div>`;
 
         const tbl=document.createElement('table');
         const thead=document.createElement('thead');
@@ -162,28 +132,17 @@
         days.forEach((d,idx)=>{
           const td=document.createElement('td'); td.className='day';
           const ds=ymd(d);
-          const isPast = ds < todayStr;
-          const weekend = isWeekend(d);
-          if(weekend) td.classList.add('redday');
-          if(ds === todayStr) td.classList.add('today');
-          if(isPast) td.classList.add('past');
-
+          if(isRedDay(ds)) td.classList.add('redday');
+          const today=new Date(); if(ymd(today)===ds) td.classList.add('today');
           const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate();
+          if(isRedDay(ds)) num.title = weekendName(ds);
           td.appendChild(num);
 
-          if(!isPast){
-            const st=getStateFromMap(cache.status, ds);
-            const badge=document.createElement('div');
-            badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可訂');
-            if(st==='available'){
-              badge.style.cursor='pointer';
-              badge.title=`撥打 ${TEL}`;
-              badge.onclick=(e)=>{ e.stopPropagation(); window.location.href=`tel:${TEL}`; };
-              td.style.cursor='pointer';
-              td.onclick=()=>{ window.location.href=`tel:${TEL}`; };
-            }
-            td.appendChild(badge);
-          }
+          const badge=document.createElement('div');
+          const st=getState(mStart.getFullYear(), ds);
+          badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可售');
+          td.appendChild(badge);
+          if(st==='full') globalFull++; else globalAvail++;
 
           tr.appendChild(td);
           const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
@@ -191,56 +150,71 @@
         if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td);} tbody.appendChild(tr); }
         tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
       }
+      document.getElementById('globalCounts').textContent=`統計（3個月） 可售：${globalAvail}｜已滿：${globalFull}`;
+      setLastUpdatedNow();
     }
 
-    function shiftMonths(n){ base = addMonths(base,n); render(); }
-
-    document.getElementById('prev3').onclick=()=>shiftMonths(-3);
-    document.getElementById('next3').onclick=()=>shiftMonths(3);
-
-    // 鍵盤 ← / → 切月（-1 / +1）
-    document.addEventListener('keydown', (e)=>{
-      const tag=(e.target && e.target.tagName)||'';
-      if(tag==='INPUT' || tag==='TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if(e.key==='ArrowLeft'){ e.preventDefault(); shiftMonths(-1); }
-      if(e.key==='ArrowRight'){ e.preventDefault(); shiftMonths(1); }
-    });
-
-    // 手機滑動：左右切換月份
-    (function enableSwipe(){
-      const area=document.getElementById('calendars');
-      let sx=0, sy=0, moving=false;
-      const THRESH_X=60, THRESH_Y=50;
-      area.addEventListener('touchstart', (e)=>{
-        if(!e.touches || e.touches.length===0) return;
-        const t=e.touches[0]; sx=t.clientX; sy=t.clientY; moving=true;
-      }, {passive:true});
-      area.addEventListener('touchend', (e)=>{
-        if(!moving) return; moving=false;
-        if(!e.changedTouches || e.changedTouches.length===0) return;
-        const t=e.changedTouches[0]; const dx=t.clientX - sx; const dy=t.clientY - sy;
-        if(Math.abs(dx) > THRESH_X && Math.abs(dy) < THRESH_Y){
-          if(dx < 0) shiftMonths(1); else shiftMonths(-1);
-        }
-      }, {passive:true});
-    })();
-
-    // ====== 啟動：載入 API（預設當年），渲染 ======
-    (async function init(){
-      try{
-        clearError();
-        const y = (new Date()).getFullYear();
-        const ac = new AbortController();
-        const t = setTimeout(()=> ac.abort(), 10000); // 10s 超時
-        const data = await fetchAvailability(y, {signal: ac.signal});
-        clearTimeout(t);
-        cache = { year: data.year||y, status: data.status||{}, updatedAt: data.updatedAt||null };
-      }catch(err){
-        console.error(err);
-        showError('目前無法連線取得最新空房資料，畫面可能不是最新。');
-        cache = { year: (new Date()).getFullYear(), status: {}, updatedAt: null };
+    function getStartMonthDate(){
+      const val=document.getElementById('startMonth').value;
+      if(val){ const [y,m]=val.split('-').map(Number); return new Date(y, m-1, 1); }
+      const y=parseInt(document.getElementById('yearSelect').value,10);
+      return new Date(y, 0, 1);
+    }
+    function setStartMonthFromDate(date){
+      const y=date.getFullYear(); const m=date.getMonth()+1;
+      const yearSel=document.getElementById('yearSelect');
+      if(y!==parseInt(yearSel.value,10)){
+        const first=+yearSel.options[0].value; const last=+yearSel.options[yearSel.options.length-1].value;
+        const target = Math.min(Math.max(y, first), last);
+        yearSel.value=String(target);
       }
-      render();
+      document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
+    }
+
+    async function ensureYearsLoaded(years){
+      const tasks = years.filter(y => !CACHE[y]).map(y => fetchYear(y).catch(console.error));
+      if(tasks.length) await Promise.all(tasks);
+    }
+
+    async function shiftMonths(n){
+      const prev = getStartMonthDate();
+      const next = addMonths(prev, n);
+      setStartMonthFromDate(next);
+      const needYears = new Set();
+      for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(next), m).getFullYear()); }
+      await ensureYearsLoaded([...needYears]);
+      renderCalendars();
+    }
+
+    document.getElementById('btnGenerate').onclick = async ()=>{
+      const y=parseInt(document.getElementById('yearSelect').value,10);
+      await ensureYearsLoaded([y]);
+      renderCalendars();
+    };
+    document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
+    document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
+
+    const now=new Date();
+    const thisYear=now.getFullYear();
+    const yearSel=document.getElementById('yearSelect');
+    for(let y=thisYear-1; y<=thisYear+7; y++){
+      const opt=document.createElement('option'); opt.value=String(y); opt.textContent=String(y); yearSel.appendChild(opt);
+    }
+    yearSel.value=String(thisYear);
+    yearSel.onchange = async ()=>{
+      const y=parseInt(yearSel.value,10);
+      setStartMonthFromDate(new Date(y, (y===thisYear? now.getMonth():0), 1));
+      await ensureYearsLoaded([y]);
+      renderCalendars();
+    };
+    setStartMonthFromDate(now);
+
+    (async ()=>{
+      const first = getStartMonthDate();
+      const needYears = new Set();
+      for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
+      await ensureYearsLoaded([...needYears]);
+      renderCalendars();
     })();
   </script>
 </body>
