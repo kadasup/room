@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表</title>
+  <title>一斗夢包棟民宿 | 空房表（修正版）</title>
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
@@ -79,7 +79,7 @@
 
     <div class="last-updated" id="lastUpdated" aria-live="polite"></div>
 
-    <p class="footer">提示：點一下切換「可售/已滿」。年份／起始月份可切換視窗；僅週末標紅。鍵盤 ← / → 可切換月份，按鈕可跳到上/下三個月。系統會在**跨日後自動重繪**，讓「昨天以前」自動變灰。</p>
+    <p class="footer">提示：點一下切換「可售/已滿」。年份／起始月份可切換視窗；僅週末標紅。鍵盤 ← / → 可切換月份，按鈕可跳到上/下三個月。系統會在<strong>跨日後自動重繪</strong>，讓「昨天以前」自動變灰。</p>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -88,7 +88,7 @@
 
     // === API 版設定 ===
     const SHEET_ID = '1sWSZIq3BpEh9UHgLYovRBexe7dIFs6cTOPsub5G1sbI';
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbw2_eYfUJedURuLN_Cu4yuoeXPSJVjbiRza6uDrLKr9ilRRVbnqaj8mE3yMOeeVaVwQIQ/exec';
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbzKqF7-PKC1Hvg3iEQQVORK-JXqLO2rEKX_i97e87-HldSBzJR3r36DEOdNHaYQmibVBQ/exec';
     const ADMIN_TOKEN = '1234567890';
     let TEST_MODE = false;
 
@@ -108,7 +108,7 @@
       const res = await fetch(API_BASE, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+ADMIN_TOKEN }, body: JSON.stringify({ year, delta }) });
       if(!res.ok) throw new Error('API POST failed '+res.status);
       const out = await res.json();
-      CACHE[year] = out?.data?.status || CACHE[year];
+      CACHE[year] = out?.data?.status || { ...(CACHE[year]||{}), ...delta }; // 後端若未回傳最新狀態，至少合併本地 delta
       return out;
     }
 
@@ -131,7 +131,7 @@
 
     function getState(year,dateStr){ const s=getSaved(year); return s[dateStr]==='full' ? 'full' : 'available'; }
     async function setState(year,dateStr,state){ if(!CACHE[year]) CACHE[year]={}; CACHE[year][dateStr]=state; try{ await apiPatch(year, { [dateStr]: state }); }catch(e){ console.error(e); } }
-    function toggle(year,dateStr){ const cur=getState(year,dateStr); const next = cur==='full'?'available':'full'; if(TEST_MODE){ if(!CACHE[year]) CACHE[year]={}; CACHE[year][dateStr]=next; return; } return setState(year,dateStr,next); }
+    function toggle(year,dateStr){ const cur=getState(year,dateStr); const next= cur==='full' ? 'available' : 'full'; if(TEST_MODE){ if(!CACHE[year]) CACHE[year]={}; CACHE[year][dateStr]=next; return; } return setState(year,dateStr,next); }
 
     function getStartMonthDate(){
       const val=document.getElementById('startMonth').value;
@@ -212,6 +212,7 @@
       setLastUpdatedNow();
     }
 
+    // === 修正：本地先更新 CACHE，再呼叫 API；成功後重繪 ===
     function resetAll(){
       const y=parseInt(document.getElementById('yearSelect').value,10);
       const base = getStartMonthDate();
@@ -223,8 +224,8 @@
         const days=rangeDays(mStart,mEnd);
         days.forEach(d=>{ const ds=ymd(d); if(ds>=todayStr) delta[ds]='available'; });
       }
-      if(TEST_MODE){ CACHE[y] = { ...(CACHE[y]||{}), ...delta }; renderCalendars(); return; }
-      apiPatch(y, delta).finally(()=> renderCalendars());
+      CACHE[y] = { ...(CACHE[y]||{}), ...delta }; // 立即更新 UI 資料
+      apiPatch(y, delta).then(()=> renderCalendars()).catch((e)=>{ console.error(e); renderCalendars(); });
     }
 
     function exportExcel(){
@@ -256,8 +257,8 @@
         const days=rangeDays(mStart,mEnd);
         days.forEach(d=>{ if(d.getDay()===6){ const ds=ymd(d); if(ds < todayStr) return; delta[ds]='full'; } });
       }
-      if(TEST_MODE){ CACHE[selectedYear] = { ...(CACHE[selectedYear]||{}), ...delta }; renderCalendars(); return; }
-      apiPatch(selectedYear, delta).finally(()=>{ if(!TEST_MODE) renderCalendars(); });
+      CACHE[selectedYear] = { ...(CACHE[selectedYear]||{}), ...delta }; // 立即更新 UI 資料
+      apiPatch(selectedYear, delta).then(()=>{ renderCalendars(); }).catch((e)=>{ console.error(e); renderCalendars(); });
     }
 
     document.getElementById('btnGenerate').onclick=renderCalendars;
