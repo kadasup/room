@@ -1,221 +1,376 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表（前台唯讀）</title>
-  <style>
-    :root{
-      --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fff0f6; --border:#dcdcdc;
-      --sticky:#ffffffee;
-    }
-    *{box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Noto Sans TC\",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
-    h2{margin:6px 0 12px;text-align:center}
-    .wrap{max-width:1200px;margin:0 auto}
-    .controls{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    label{display:flex;gap:8px;align-items:center;color:var(--muted)}
-    input[type=\"month\"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
-    button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
-    button:hover{background:var(--brand-600)}
-    .secondary{background:#e9eefb;color:#0f2d62}
-    .legend{display:flex;gap:12px;align-items:center;font-size:14px;color:#444;margin:6px 0 14px}
-    .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-    .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:1}
-    .cal-title{font-weight:700}
-    table{width:100%;border-collapse:separate;border-spacing:0}
-    th,td{border:1px solid var(--border);text-align:center;padding:8px;vertical-align:top}
-    thead th{background:var(--sticky)}
-    td.day{height:92px;position:relative}
-    .num{position:absolute;top:6px;left:8px;font-size:13px;color:#444}
-    .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
-    .available{background:var(--ok)}
-    .full{background:var(--bad)}
-    .redday{ background: var(--redbg); }
-    .redday .num{ color: var(--redtxt); font-weight:700 }
-    .today{ box-shadow: inset 0 0 0 3px #ff85c0; background: var(--today) }
-    .muted-text{color:#aaa}
-    .counts{font-size:13px;color:#666}
-    .footer{margin-top:10px;color:#666;font-size:12px;text-align:center}
-    .last-updated{ position:fixed; right:12px; bottom:12px; background:#fff; border:1px solid var(--border); color:#666; padding:6px 10px; border-radius:10px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.04) }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>一斗夢包棟民宿 | 空房表（前台除錯版）</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px}
+  .wrap{max-width:1200px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .calendar{border:1px solid #ddd;border-radius:12px;overflow:hidden}
+  .cal-head{padding:8px 12px;border-bottom:1px solid #eee;font-weight:700}
+  table{width:100%;border-collapse:separate;border-spacing:0}
+  th,td{border:1px solid #eee;text-align:center;padding:6px}
+  td.day{height:80px;position:relative}
+  .num{position:absolute;top:6px;left:8px;font-size:13px;color:#444}
+  .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:2px 6px;border-radius:999px;font-size:12px}
+  .available{background:#c8e6c9}
+  .full{background:#ffcdd2}
+  #debug{white-space:pre-wrap;background:#111;color:#0f0;padding:10px;border-radius:8px;margin:16px 0;max-height:260px;overflow:auto}
+</style>
 </head>
 <body>
-  <div class=\"wrap\">
-    <h2>一斗夢包棟民宿 | 空房表（前台唯讀）</h2>
-
-    <div class=\"controls\" role=\"group\" aria-label=\"基本設定\">
-      <label>年份：
-        <select id=\"yearSelect\" title=\"選擇年份\"></select>
-      </label>
-      <label>起始月份：<input type=\"month\" id=\"startMonth\"></label>
-      <button id=\"btnGenerate\">重新產生</button>
-      <button id=\"btnPrev3\" class=\"secondary\" title=\"快速跳到上三個月 (← 也可切月)\">◀︎ 上三個月</button>
-      <button id=\"btnNext3\" class=\"secondary\" title=\"快速跳到下三個月 (→ 也可切月)\">下三個月 ▶︎</button>
-      <span class=\"counts\" id=\"globalCounts\" style=\"justify-self:end\"></span>
-    </div>
-
-    <div class=\"legend\">
-      <span><span class=\"dot\" style=\"background:var(--ok)\"></span>可售</span>
-      <span><span class=\"dot\" style=\"background:var(--bad)\"></span>已滿</span>
-      <span><span class=\"dot\" style=\"background:var(--redbg); border-color:#f4b4b4\"></span>週末（週六/週日）</span>
-      <span><span class=\"dot\" style=\"background:var(--today); box-shadow: inset 0 0 0 2px #ff85c0\"></span>今天</span>
-    </div>
-
-    <div id=\"calendars\" class=\"grid\" aria-label=\"三個月月曆\"></div>
-    <div class=\"last-updated\" id=\"lastUpdated\" aria-live=\"polite\"></div>
-    <p class=\"footer\">此頁為唯讀展示。若需更改房況請至後台。</p>
+<div class="wrap">
+  <h2>前台（除錯版）</h2>
+  <div>
+    <label>年份：<select id="yearSelect"></select></label>
+    <label>起始月份：<input type="month" id="startMonth"></label>
+    <button id="btnGenerate">重新產生</button>
+    <button id="btnPrev3">◀︎ 上三個月</button>
+    <button id="btnNext3">下三個月 ▶︎</button>
+    <span id="globalCounts" style="margin-left:8px;color:#666"></span>
   </div>
+  <p>API_BASE：<code id="apiBaseEl"></code></p>
+  <div id="debug" aria-live="polite">[debug log]</div>
+  <div id="calendars" class="grid"></div>
+</div>
+<script>
+const API_BASE = 'https://script.google.com/macros/s/AKfycbzKqF7-PKC1Hvg3iEQQVORK-JXqLO2rEKX_i97e87-HldSBzJR3r36DEOdNHaYQmibVBQ/exec';
+document.getElementById('apiBaseEl').textContent = API_BASE;
+const LABEL='空房表';
+const CACHE={};
 
-  <script>
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbyG0fc24V4gRiFyHYb2Uxo5W4asc6ojsnEHI85sE5BPloFKIeR5618T0LP3649VztA5hQ\exec';
-    const LABEL = '空房表';
+function log(){ const el=document.getElementById('debug'); el.textContent += '\\n' + Array.from(arguments).map(v=>typeof v==='string'?v:JSON.stringify(v)).join(' '); el.scrollTop = el.scrollHeight; }
+window.addEventListener('error', e=>{ log('[window.error]', e.message || e); });
+window.addEventListener('unhandledrejection', e=>{ log('[unhandledrejection]', String(e.reason||e)); });
 
-    const CACHE = {};
+function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
+function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
+function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
+function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
+function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
 
-    function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
-    function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
-    function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
-    function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
-    function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
-    function pad2(n){ return String(n).padStart(2,'0'); }
-    function formatDateTime(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
-    function setLastUpdatedNow(){ const el=document.getElementById('lastUpdated'); if(el) el.textContent = `上次更新：${formatDateTime(new Date())}`; }
-    function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
-    function isRedDay(dateStr){ return isWeekend(new Date(dateStr)); }
-    function weekendName(dateStr){ const d=new Date(dateStr); return d.getDay()===0? '週日' : '週六'; }
-    function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
+function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
 
-    async function fetchYear(year){
-      if(CACHE[year]) return CACHE[year];
-      const u = new URL(API_BASE);
-      u.searchParams.set('year', String(year));
-      const res = await fetch(u.toString(), { headers:{'Accept':'application/json'} });
-      if(!res.ok) throw new Error('API GET failed '+res.status);
-      const data = await res.json();
-      CACHE[year] = data.status || {};
-      return CACHE[year];
-    }
+async function fetchYear(year){
+  if(CACHE[year]) return CACHE[year];
+  const u = new URL(API_BASE); u.searchParams.set('year', String(year));
+  log('GET', u.toString());
+  const res = await fetch(u.toString(), { headers:{'Accept':'application/json'} });
+  log('status', res.status);
+  const text = await res.text();
+  log('body', text.slice(0,300));
+  let data; try{ data = JSON.parse(text); }catch(e){ throw new Error('JSON parse error'); }
+  CACHE[year] = data.status || {};
+  return CACHE[year];
+}
 
-    function renderCalendars(){
-      const holder=document.getElementById('calendars');
-      holder.innerHTML='';
-      const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const todayStr = ymd(new Date());
+function renderCalendars(){
+  const holder=document.getElementById('calendars');
+  holder.innerHTML='';
+  const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
+  const base = getStartMonthDate();
+  const first = startOfMonth(base);
 
-      let globalAvail=0, globalFull=0;
+  let globalAvail=0, globalFull=0;
 
-      for(let m=0;m<3;m++){
-        const mStart = addMonths(first,m);
-        const mEnd = endOfMonth(mStart);
-        const lead = mStart.getDay();
-        const days = rangeDays(mStart,mEnd);
+  for(let m=0;m<3;m++){
+    const mStart = addMonths(first,m);
+    const mEnd = endOfMonth(mStart);
+    const lead = mStart.getDay();
+    const days = rangeDays(mStart,mEnd);
 
-        const cal=document.createElement('div'); cal.className='calendar';
-        cal.innerHTML=`<div class=\"cal-head\"><div class=\"cal-title\">${mStart.getFullYear()} 年 ${mStart.getMonth()+1} 月｜${LABEL}</div></div>`;
+    const cal=document.createElement('div'); cal.className='calendar';
+    cal.innerHTML='<div class="cal-head">'+mStart.getFullYear()+' 年 '+(mStart.getMonth()+1)+' 月｜'+LABEL+'</div>';
 
-        const tbl=document.createElement('table');
-        const thead=document.createElement('thead');
-        const trh=document.createElement('tr');
-        '日,一,二,三,四,五,六'.split(',').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; trh.appendChild(th); });
-        thead.appendChild(trh); tbl.appendChild(thead);
+    const tbl=document.createElement('table');
+    const thead=document.createElement('thead');
+    const trh=document.createElement('tr');
+    '日,一,二,三,四,五,六'.split(',').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; trh.appendChild(th); });
+    thead.appendChild(trh); tbl.appendChild(thead);
 
-        const tbody=document.createElement('tbody');
-        let tr=document.createElement('tr');
-        for(let i=0;i<lead;i++){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td); }
+    const tbody=document.createElement('tbody');
+    let tr=document.createElement('tr');
+    for(let i=0;i<lead;i++){ const td=document.createElement('td'); td.className='day'; tr.appendChild(td); }
 
-        days.forEach((d,idx)=>{
-          const td=document.createElement('td'); td.className='day';
-          const ds=ymd(d);
-          if(isRedDay(ds)) td.classList.add('redday');
-          const today=new Date(); if(ymd(today)===ds) td.classList.add('today');
-          const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate();
-          if(isRedDay(ds)) num.title = weekendName(ds);
-          td.appendChild(num);
+    days.forEach((d,idx)=>{
+      const td=document.createElement('td'); td.className='day';
+      const ds=ymd(d);
+      const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate(); td.appendChild(num);
 
-          const badge=document.createElement('div');
-          const st=getState(mStart.getFullYear(), ds);
-          badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可售');
-          td.appendChild(badge);
-          if(st==='full') globalFull++; else globalAvail++;
+      const badge=document.createElement('div');
+      const st=getState(mStart.getFullYear(), ds);
+      badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可售');
+      td.appendChild(badge);
 
-          tr.appendChild(td);
-          const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
-        });
-        if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td);} tbody.appendChild(tr); }
-        tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
-      }
-      document.getElementById('globalCounts').textContent=`統計（3個月） 可售：${globalAvail}｜已滿：${globalFull}`;
-      setLastUpdatedNow();
-    }
+      if(st==='full') globalFull++; else globalAvail++;
+      tr.appendChild(td);
+      const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
+    });
+    if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day'; tr.appendChild(td);} tbody.appendChild(tr); }
+    tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
+  }
+  document.getElementById('globalCounts').textContent='統計（3個月） 可售：'+globalAvail+'｜已滿：'+globalFull;
+}
 
-    function getStartMonthDate(){
-      const val=document.getElementById('startMonth').value;
-      if(val){ const [y,m]=val.split('-').map(Number); return new Date(y, m-1, 1); }
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      return new Date(y, 0, 1);
-    }
-    function setStartMonthFromDate(date){
-      const y=date.getFullYear(); const m=date.getMonth()+1;
-      const yearSel=document.getElementById('yearSelect');
-      if(y!==parseInt(yearSel.value,10)){
-        const first=+yearSel.options[0].value; const last=+yearSel.options[yearSel.options.length-1].value;
-        const target = Math.min(Math.max(y, first), last);
-        yearSel.value=String(target);
-      }
-      document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
-    }
+function getStartMonthDate(){
+  const val=document.getElementById('startMonth').value;
+  if(val){ const [y,m]=val.split('-').map(Number); return new Date(y, m-1, 1); }
+  const y=parseInt(document.getElementById('yearSelect').value,10);
+  return new Date(y, 0, 1);
+}
+function setStartMonthFromDate(date){
+  const y=date.getFullYear(); const m=date.getMonth()+1;
+  const yearSel=document.getElementById('yearSelect');
+  if(y!==parseInt(yearSel.value,10)){
+    const first=+yearSel.options[0].value; const last=+yearSel.options[yearSel.options.length-1].value;
+    const target = Math.min(Math.max(y, first), last);
+    yearSel.value=String(target);
+  }
+  document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
+}
 
-    async function ensureYearsLoaded(years){
-      const tasks = years.filter(y => !CACHE[y]).map(y => fetchYear(y).catch(console.error));
-      if(tasks.length) await Promise.all(tasks);
-    }
+async function ensureYearsLoaded(years){
+  const tasks = years.filter(y => !CACHE[y]).map(y => fetchYear(y).catch(err=>log('fetchYear error', String(err))));
+  if(tasks.length) await Promise.all(tasks);
+}
 
-    async function shiftMonths(n){
-      const prev = getStartMonthDate();
-      const next = addMonths(prev, n);
-      setStartMonthFromDate(next);
-      const needYears = new Set();
-      for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(next), m).getFullYear()); }
-      await ensureYearsLoaded([...needYears]);
-      renderCalendars();
-    }
+async function shiftMonths(n){
+  const prev = getStartMonthDate();
+  const next = addMonths(prev, n);
+  setStartMonthFromDate(next);
+  const needYears = new Set();
+  for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(next), m).getFullYear()); }
+  await ensureYearsLoaded([...needYears]);
+  renderCalendars();
+}
 
-    document.getElementById('btnGenerate').onclick = async ()=>{
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      await ensureYearsLoaded([y]);
-      renderCalendars();
-    };
-    document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
-    document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
+document.getElementById('btnGenerate').onclick = async ()=>{
+  const y=parseInt(document.getElementById('yearSelect').value,10);
+  await ensureYearsLoaded([y]);
+  renderCalendars();
+};
+document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
+document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
 
-    const now=new Date();
-    const thisYear=now.getFullYear();
-    const yearSel=document.getElementById('yearSelect');
-    for(let y=thisYear-1; y<=thisYear+7; y++){
-      const opt=document.createElement('option'); opt.value=String(y); opt.textContent=String(y); yearSel.appendChild(opt);
-    }
-    yearSel.value=String(thisYear);
-    yearSel.onchange = async ()=>{
-      const y=parseInt(yearSel.value,10);
-      setStartMonthFromDate(new Date(y, (y===thisYear? now.getMonth():0), 1));
-      await ensureYearsLoaded([y]);
-      renderCalendars();
-    };
-    setStartMonthFromDate(now);
+// 初始化年份
+const now=new Date();
+const thisYear=now.getFullYear();
+const yearSel=document.getElementById('yearSelect');
+for(let y=thisYear-1; y<=thisYear+7; y++){
+  const opt=document.createElement('option'); opt.value=String(y); opt.textContent=String(y); yearSel.appendChild(opt);
+}
+yearSel.value=String(thisYear);
+yearSel.onchange = async ()=>{
+  const y=parseInt(yearSel.value,10);
+  setStartMonthFromDate(new Date(y, (y===thisYear? now.getMonth():0), 1));
+  await ensureYearsLoaded([y]);
+  renderCalendars();
+};
+setStartMonthFromDate(now);
 
-    (async ()=>{
-      const first = getStartMonthDate();
-      const needYears = new Set();
-      for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
-      await ensureYearsLoaded([...needYears]);
-      renderCalendars();
-    })();
-  </script>
+(async ()=>{
+  const first = getStartMonthDate();
+  const needYears = new Set();
+  for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
+  await ensureYearsLoaded([...needYears]);
+  renderCalendars();
+})();
+</script>
+</body>
+</html>
+"""
+
+p = Path("/mnt/data/index_debug.html")
+p.write_text(debug_html, encoding="utf-8")
+print(str(p))
+
+已分析
+python
+永遠顯示詳細資料
+
+複製程式碼
+from pathlib import Path
+
+debug_html = """<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>一斗夢包棟民宿 | 空房表（前台除錯版）</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px}
+  .wrap{max-width:1200px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .calendar{border:1px solid #ddd;border-radius:12px;overflow:hidden}
+  .cal-head{padding:8px 12px;border-bottom:1px solid #eee;font-weight:700}
+  table{width:100%;border-collapse:separate;border-spacing:0}
+  th,td{border:1px solid #eee;text-align:center;padding:6px}
+  td.day{height:80px;position:relative}
+  .num{position:absolute;top:6px;left:8px;font-size:13px;color:#444}
+  .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:2px 6px;border-radius:999px;font-size:12px}
+  .available{background:#c8e6c9}
+  .full{background:#ffcdd2}
+  #debug{white-space:pre-wrap;background:#111;color:#0f0;padding:10px;border-radius:8px;margin:16px 0;max-height:260px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>前台（除錯版）</h2>
+  <div>
+    <label>年份：<select id="yearSelect"></select></label>
+    <label>起始月份：<input type="month" id="startMonth"></label>
+    <button id="btnGenerate">重新產生</button>
+    <button id="btnPrev3">◀︎ 上三個月</button>
+    <button id="btnNext3">下三個月 ▶︎</button>
+    <span id="globalCounts" style="margin-left:8px;color:#666"></span>
+  </div>
+  <p>API_BASE：<code id="apiBaseEl"></code></p>
+  <div id="debug" aria-live="polite">[debug log]</div>
+  <div id="calendars" class="grid"></div>
+</div>
+<script>
+const API_BASE = 'https://script.google.com/macros/s/AKfycbzKqF7-PKC1Hvg3iEQQVORK-JXqLO2rEKX_i97e87-HldSBzJR3r36DEOdNHaYQmibVBQ/exec';
+document.getElementById('apiBaseEl').textContent = API_BASE;
+const LABEL='空房表';
+const CACHE={};
+
+function log(){ const el=document.getElementById('debug'); el.textContent += '\\n' + Array.from(arguments).map(v=>typeof v==='string'?v:JSON.stringify(v)).join(' '); el.scrollTop = el.scrollHeight; }
+window.addEventListener('error', e=>{ log('[window.error]', e.message || e); });
+window.addEventListener('unhandledrejection', e=>{ log('[unhandledrejection]', String(e.reason||e)); });
+
+function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
+function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
+function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
+function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
+function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
+
+function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
+
+async function fetchYear(year){
+  if(CACHE[year]) return CACHE[year];
+  const u = new URL(API_BASE); u.searchParams.set('year', String(year));
+  log('GET', u.toString());
+  const res = await fetch(u.toString(), { headers:{'Accept':'application/json'} });
+  log('status', res.status);
+  const text = await res.text();
+  log('body', text.slice(0,300));
+  let data; try{ data = JSON.parse(text); }catch(e){ throw new Error('JSON parse error'); }
+  CACHE[year] = data.status || {};
+  return CACHE[year];
+}
+
+function renderCalendars(){
+  const holder=document.getElementById('calendars');
+  holder.innerHTML='';
+  const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
+  const base = getStartMonthDate();
+  const first = startOfMonth(base);
+
+  let globalAvail=0, globalFull=0;
+
+  for(let m=0;m<3;m++){
+    const mStart = addMonths(first,m);
+    const mEnd = endOfMonth(mStart);
+    const lead = mStart.getDay();
+    const days = rangeDays(mStart,mEnd);
+
+    const cal=document.createElement('div'); cal.className='calendar';
+    cal.innerHTML='<div class="cal-head">'+mStart.getFullYear()+' 年 '+(mStart.getMonth()+1)+' 月｜'+LABEL+'</div>';
+
+    const tbl=document.createElement('table');
+    const thead=document.createElement('thead');
+    const trh=document.createElement('tr');
+    '日,一,二,三,四,五,六'.split(',').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; trh.appendChild(th); });
+    thead.appendChild(trh); tbl.appendChild(thead);
+
+    const tbody=document.createElement('tbody');
+    let tr=document.createElement('tr');
+    for(let i=0;i<lead;i++){ const td=document.createElement('td'); td.className='day'; tr.appendChild(td); }
+
+    days.forEach((d,idx)=>{
+      const td=document.createElement('td'); td.className='day';
+      const ds=ymd(d);
+      const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate(); td.appendChild(num);
+
+      const badge=document.createElement('div'); const st=getState(mStart.getFullYear(), ds);
+      badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可售');
+      td.appendChild(badge);
+
+      if(st==='full') globalFull++; else globalAvail++;
+      tr.appendChild(td);
+      const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
+    });
+    if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day'; tr.appendChild(td);} tbody.appendChild(tr); }
+    tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
+  }
+  document.getElementById('globalCounts').textContent='統計（3個月） 可售：'+globalAvail+'｜已滿：'+globalFull;
+}
+
+function getStartMonthDate(){
+  const val=document.getElementById('startMonth').value;
+  if(val){ const [y,m]=val.split('-').map(Number); return new Date(y, m-1, 1); }
+  const y=parseInt(document.getElementById('yearSelect').value,10);
+  return new Date(y, 0, 1);
+}
+function setStartMonthFromDate(date){
+  const y=date.getFullYear(); const m=date.getMonth()+1;
+  const yearSel=document.getElementById('yearSelect');
+  if(y!==parseInt(yearSel.value,10)){
+    const first=+yearSel.options[0].value; const last=+yearSel.options[yearSel.options.length-1].value;
+    const target = Math.min(Math.max(y, first), last);
+    yearSel.value=String(target);
+  }
+  document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
+}
+
+async function ensureYearsLoaded(years){
+  const tasks = years.filter(y => !CACHE[y]).map(y => fetchYear(y).catch(err=>log('fetchYear error', String(err))));
+  if(tasks.length) await Promise.all(tasks);
+}
+
+async function shiftMonths(n){
+  const prev = getStartMonthDate();
+  const next = addMonths(prev, n);
+  setStartMonthFromDate(next);
+  const needYears = new Set();
+  for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(next), m).getFullYear()); }
+  await ensureYearsLoaded([...needYears]);
+  renderCalendars();
+}
+
+document.getElementById('btnGenerate').onclick = async ()=>{
+  const y=parseInt(document.getElementById('yearSelect').value,10);
+  await ensureYearsLoaded([y]);
+  renderCalendars();
+};
+document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
+document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
+
+// 初始化年份
+const now=new Date();
+const thisYear=now.getFullYear();
+const yearSel=document.getElementById('yearSelect');
+for(let y=thisYear-1; y<=thisYear+7; y++){
+  const opt=document.createElement('option'); opt.value=String(y); opt.textContent=String(y); yearSel.appendChild(opt);
+}
+yearSel.value=String(thisYear);
+yearSel.onchange = async ()=>{
+  const y=parseInt(yearSel.value,10);
+  setStartMonthFromDate(new Date(y, (y===thisYear? now.getMonth():0), 1));
+  await ensureYearsLoaded([y]);
+  renderCalendars();
+};
+setStartMonthFromDate(now);
+
+(async ()=>{
+  const first = getStartMonthDate();
+  const needYears = new Set();
+  for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
+  await ensureYearsLoaded([...needYears]);
+  renderCalendars();
+})();
+</script>
 </body>
 </html>
