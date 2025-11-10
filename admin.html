@@ -2,19 +2,18 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表（修正版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>一斗夢包棟民宿 | 後台（API版）</title>
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fff0f6; --border:#dcdcdc;
-      --sticky:#ffffffee;
+      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fff0f6; --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
     h2{margin:6px 0 12px;text-align:center}
-    .wrap{max-width:1200px;margin:0 auto}
-    .controls{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .wrap{max-width:1100px;margin:0 auto}
+    .controls{display:grid;grid-template-columns:repeat(6,auto);gap:8px;align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     label{display:flex;gap:8px;align-items:center;color:var(--muted)}
     input[type="month"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
     button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
@@ -24,388 +23,274 @@
     .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:1}
+    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--sticky);position:sticky;top:0;z-index:1}
     .cal-title{font-weight:700}
     table{width:100%;border-collapse:separate;border-spacing:0}
-    th,td{border:1px solid var(--border);text-align:center;padding:8px;vertical-align:top}
-    thead th{background:var(--sticky)}
-    td.day{height:92px;position:relative;cursor:pointer}
-    .num{position:absolute;top:6px;left:8px;font-size:13px;color:#444}
-    .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
-    .available{background:var(--ok)}
+    th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
+    thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
+    .day{cursor:pointer;border-left:1px solid var(--border);min-height:52px;vertical-align:top;position:relative}
+    .day:first-child{border-left:none}
+    .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555}
+    .state{margin-top:22px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
     .full{background:var(--bad)}
-    .redday{ background: var(--redbg); }
-    .redday .num{ color: var(--redtxt); font-weight:700 }
-    .today{ box-shadow: inset 0 0 0 3px #ff85c0; background: var(--today) }
-    .muted-text{color:#aaa}
-    .counts{font-size:13px;color:#666}
-    .footer{margin-top:10px;color:#666;font-size:12px;text-align:center}
-    #testResults{ display:none; margin-top:10px; background:#fff; border:1px dashed #ccc; padding:10px; border-radius:8px; font-size:13px }
-    .past{ background:#f1f3f5; cursor:not-allowed }
-    .past .num{ color:#9aa0a6 }
-    .past .badge{ opacity:.6 }
-    .last-updated{ position:fixed; right:12px; bottom:12px; background:#fff; border:1px solid var(--border); color:#666; padding:6px 10px; border-radius:10px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.04) }
+    .free{background:var(--ok)}
+    .is-today{box-shadow: inset 0 0 0 2px #ff85c0; background:var(--today)}
+    .weekend{background:#fff8f8}
+    .muted{color:#aaa}
+    .footer{margin-top:12px;color:#666;font-size:13px}
+    .counts{font-variant-numeric:tabular-nums}
+    .notice{color:#d32f2f;font-weight:600}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff}
+    .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
+    @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿 | 空房表</h2>
+    <h2>房況後台（API 版）</h2>
 
-    <div class="controls" role="group" aria-label="基本設定">
-      <label>年份：
-        <select id="yearSelect" title="選擇年份"></select>
+    <div class="controls">
+      <label>年份
+        <select id="yearSel"></select>
       </label>
-      <label>起始月份：<input type="month" id="startMonth"></label>
-      <button id="btnGenerate">重新產生</button>
-      <button id="btnPrev3" class="secondary" title="快速跳到上三個月 (← 也可切月)">◀︎ 上三個月</button>
-      <button id="btnNext3" class="secondary" title="快速跳到下三個月 (→ 也可切月)">下三個月 ▶︎</button>
-      <button id="btnReset" class="secondary">重置為全部可售</button>
-      <button id="btnSatFull" class="secondary" title="將目前三個月內的每個週六一鍵設為已滿">一鍵週六設為已滿</button>
-      <button id="btnExport">匯出Excel</button>
-      <button id="btnSelfTest" class="secondary">執行自測</button>
-      <span class="counts" id="globalCounts" style="justify-self:end"></span>
+      <label>起始月份
+        <input id="startMonth" type="month">
+      </label>
+      <button id="btnReload" class="secondary">重新載入</button>
+      <button id="btnSetSatFull" class="secondary">本月週六→已滿</button>
+      <button id="btnSetAllFree" class="secondary">本月全部→可售</button>
+      <span style="justify-self:end" id="lastSync" class="chip">未同步</span>
     </div>
 
     <div class="legend">
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-      <span><span class="dot" style="background:var(--redbg); border-color:#f4b4b4"></span>週末（週六/週日）</span>
+      <span><span class="dot" style="background:#fff8f8; border-color:#f4b4b4"></span>週末</span>
       <span><span class="dot" style="background:var(--today); box-shadow: inset 0 0 0 2px #ff85c0"></span>今天</span>
     </div>
 
     <div id="calendars" class="grid" aria-label="三個月月曆"></div>
 
-    <div id="testResults"></div>
-
-    <div class="last-updated" id="lastUpdated" aria-live="polite"></div>
-
-    <p class="footer">提示：點一下切換「可售/已滿」。年份／起始月份可切換視窗；僅週末標紅。鍵盤 ← / → 可切換月份，按鈕可跳到上/下三個月。系統會在<strong>跨日後自動重繪</strong>，讓「昨天以前」自動變灰。</p>
+    <div class="footer">
+      <div>API：<span id="apiBase" class="link"></span></div>
+      <div class="notice">若遇「CORS/預檢」錯誤：請確認 Apps Script 網頁應用程式部署為「以 <b>我</b> 執行」且「<b>任何人</b> 可存取」，並確保本頁與前台使用同一個 /exec。</div>
+    </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
-    const LABEL = '空房表';
-
-    // === API 版設定 ===
-    const SHEET_ID = '1sWSZIq3BpEh9UHgLYovRBexe7dIFs6cTOPsub5G1sbI';
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbwyYtllJHFPsRMb8vNDyX-ADZqBG0GToXp7uT_ooZKhcFmfUqDkM4LqgHiEbeLREYY33w/exec';
+    // ====== 必填常數（請確認是同一個 /exec）======
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
     const ADMIN_TOKEN = '1234567890';
-    let TEST_MODE = false;
+    // =============================================
 
-    const CACHE = {};
+    // 簡單快取（記憶體）
+    const CACHE = {}; // { [year:number]: { 'YYYY-MM-DD': 'full'|'free' } }
 
+    // 工具
+    const fmt = (d)=>d.toISOString().slice(0,10);
+    const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
+    const todayStr = fmt(new Date());
+
+    // ===== API GET：帶防快取 =====
     async function apiGet(year){
       const u = new URL(API_BASE);
       u.searchParams.set('year', String(year));
-      const res = await fetch(u.toString(), { headers: { 'Accept':'application/json' } });
-      if(!res.ok) throw new Error('API GET failed '+res.status);
-      const data = await res.json();
-      CACHE[year] = data.status || {};
-      return CACHE[year];
+      u.searchParams.set('t', Date.now()); // 破快取
+      const res = await fetch(u.toString(), {
+        headers:{ 'Accept':'application/json' },
+        cache:'no-store'
+      });
+      if(!res.ok) throw new Error('GET failed '+res.status);
+      const json = await res.json();
+      CACHE[year] = json?.status || {};
+      document.querySelector('#lastSync').textContent = '讀取於 ' + new Date().toLocaleString();
+      return json;
     }
+
+    // ===== API POST：使用 FormData，避免預檢 =====
     async function apiPatch(year, delta){
-  if(TEST_MODE) return { ok:true, skipped:true };
-  const res = await fetch(API_BASE, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body: JSON.stringify({ token: ADMIN_TOKEN, year, delta }) // ← 加上 token
-  });
-  if(!res.ok) throw new Error('API POST failed '+res.status);
-  const out = await res.json();
-  CACHE[year] = out?.data?.status || { ...(CACHE[year]||{}), ...delta };
-  return out;
-}
+      // delta: { 'YYYY-MM-DD': 'full'|'free'|'' }
+      const fd = new FormData();
+      fd.append('token', ADMIN_TOKEN);
+      fd.append('year', String(year));
+      fd.append('delta', JSON.stringify(delta));
 
-    function storageKey(year){ return `vacancy-calendar-${year}`; }
-    function getSaved(year){ return CACHE[year] || {}; }
-    function save(year, obj){ CACHE[year] = obj; }
-
-    function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
-    function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
-    function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
-    function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
-    function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
-    function pad2(n){ return String(n).padStart(2,'0'); }
-    function formatDateTime(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
-    function setLastUpdatedNow(){ const el=document.getElementById('lastUpdated'); if(el) el.textContent = `上次更新：${formatDateTime(new Date())}`; }
-
-    function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
-    function isRedDay(_year, dateStr){ return isWeekend(new Date(dateStr)); }
-    function weekendName(dateStr){ const d=new Date(dateStr); return d.getDay()===0? '週日' : '週六'; }
-
-    function getState(year,dateStr){ const s=getSaved(year); return s[dateStr]==='full' ? 'full' : 'available'; }
-    async function setState(year,dateStr,state){ if(!CACHE[year]) CACHE[year]={}; CACHE[year][dateStr]=state; try{ await apiPatch(year, { [dateStr]: state }); }catch(e){ console.error(e); } }
-    function toggle(year,dateStr){ const cur=getState(year,dateStr); const next= cur==='full' ? 'available' : 'full'; if(TEST_MODE){ if(!CACHE[year]) CACHE[year]={}; CACHE[year][dateStr]=next; return; } return setState(year,dateStr,next); }
-
-    function getStartMonthDate(){
-      const val=document.getElementById('startMonth').value;
-      if(val){ const [y,m]=val.split('-').map(Number); return new Date(y, m-1, 1); }
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      return new Date(y, 0, 1);
-    }
-    function setStartMonthFromDate(date){
-      const y=date.getFullYear(); const m=date.getMonth()+1;
-      const yearSel=document.getElementById('yearSelect');
-      if(y!==parseInt(yearSel.value,10)){
-        const first=+yearSel.options[0].value; const last=+yearSel.options[yearSel.options.length-1].value;
-        const target = Math.min(Math.max(y, first), last);
-        yearSel.value=String(target);
+      const res = await fetch(API_BASE, { method:'POST', body:fd, redirect:'follow' });
+      if(!res.ok) throw new Error('POST failed '+res.status);
+      const out = await res.json();
+      if(out?.data?.status){
+        CACHE[year] = out.data.status;
+      }else{
+        // 保底：就地合併
+        CACHE[year] = { ...(CACHE[year]||{}), ...delta };
       }
-      document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
+      document.querySelector('#lastSync').textContent = '已寫入於 ' + new Date().toLocaleString();
+      return out;
     }
-    function shiftMonths(n){ const cur=getStartMonthDate(); const next=addMonths(cur,n); setStartMonthFromDate(next); renderCalendars(); }
+
+    // ===== 介面 =====
+    const elYear = document.getElementById('yearSel');
+    const elMonth = document.getElementById('startMonth');
+    const elCals = document.getElementById('calendars');
+
+    function initSelectors(){
+      const now = new Date();
+      const y0 = now.getFullYear() - 1;
+      const y1 = now.getFullYear() + 2;
+      elYear.innerHTML = '';
+      for(let y=y0; y<=y1; y++){
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = y;
+        if(y===now.getFullYear()) opt.selected = true;
+        elYear.appendChild(opt);
+      }
+      elMonth.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    }
+
+    function monthDays(y,m){
+      const last = new Date(y, m, 0).getDate();
+      return Array.from({length:last}, (_,i)=>i+1);
+    }
 
     function renderCalendars(){
-      const holder=document.getElementById('calendars');
-      holder.innerHTML='';
-      const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const todayStr = ymd(new Date());
+      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+      const months = [0,1,2].map(k=>{
+        let y=Y, m=M+k;
+        if(m>12){ y += Math.floor((m-1)/12); m = ((m-1)%12)+1; }
+        return {y, m};
+      });
 
-      let globalAvail=0, globalFull=0;
+      elCals.innerHTML = '';
+      months.forEach(({y,m})=>{
+        const cal = document.createElement('div');
+        cal.className = 'calendar';
 
-      for(let m=0;m<3;m++){
-        const mStart = addMonths(first,m);
-        const mEnd = endOfMonth(mStart);
-        const lead = mStart.getDay();
-        const days = rangeDays(mStart,mEnd);
+        const head = document.createElement('div');
+        head.className = 'cal-head';
+        head.innerHTML = `<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;
+        cal.appendChild(head);
 
-        const cal=document.createElement('div'); cal.className='calendar';
-        cal.innerHTML=`<div class="cal-head"><div class="cal-title">${mStart.getFullYear()} 年 ${mStart.getMonth()+1} 月｜${LABEL}</div></div>`;
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = `<tr>
+          <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th>
+        </tr>`;
+        table.appendChild(thead);
 
-        const tbl=document.createElement('table');
-        const thead=document.createElement('thead');
-        const trh=document.createElement('tr');
-        '日,一,二,三,四,五,六'.split(',').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; trh.appendChild(th); });
-        thead.appendChild(trh); tbl.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        // 以周為列
+        const firstWd = (new Date(y,m-1,1).getDay()+6)%7; // Monday first
+        const days = monthDays(y,m);
+        let row = document.createElement('tr');
+        for(let i=0;i<firstWd;i++) row.appendChild(document.createElement('td'));
+        let fullCount=0, freeCount=0;
 
-        const tbody=document.createElement('tbody');
-        let tr=document.createElement('tr');
-        for(let i=0;i<lead;i++){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td); }
+        days.forEach(day=>{
+          const td = document.createElement('td');
+          td.className = 'day' + (isWeekend(y,m,day)?' weekend':'');
+          const dstr = ymd(y,m,day);
+          const state = (CACHE[y]?.[dstr] || 'free'); // 預設可售
+          if(state==='full') fullCount++; else freeCount++;
 
-        days.forEach((d,idx)=>{
-          const td=document.createElement('td'); td.className='day';
-          const ds=ymd(d);
-          const isPast = ds < todayStr;
-          if(isRedDay(selectedYear, ds)) td.classList.add('redday');
-          const today=new Date(); if(ymd(today)===ds) td.classList.add('today');
-          if(isPast) td.classList.add('past');
-          const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate();
-          if(isRedDay(selectedYear, ds)) num.title = weekendName(ds);
-          td.appendChild(num);
+          td.innerHTML = `
+            <span class="dateNo">${day}</span>
+            <span class="state ${state==='full'?'full':'free'}">${state==='full'?'已滿':'可售'}</span>
+          `;
+          if(dstr===todayStr) td.classList.add('is-today');
 
-          if(!isPast){
-            const badge=document.createElement('div');
-            const st=getState(selectedYear, ds);
-            badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可售');
-            td.appendChild(badge);
-            td.onclick=()=>{ toggle(selectedYear, ds); const st2=getState(selectedYear, ds); badge.className='badge '+st2; badge.textContent=(st2==='full'?'已滿':'可售'); updateCounts(); };
-            if(st==='full') globalFull++; else globalAvail++;
-          } else {
-            td.onclick=()=>{};
+          td.addEventListener('click', async ()=>{
+            const cur = (CACHE[y]?.[dstr] || 'free');
+            const next = cur==='full' ? 'free' : 'full';
+            // 先本地更新（立即有感）
+            CACHE[y] = CACHE[y] || {};
+            CACHE[y][dstr] = next;
+            td.querySelector('.state').className = 'state ' + (next==='full'?'full':'free');
+            td.querySelector('.state').textContent = (next==='full'?'已滿':'可售');
+            updateCounts(y,m);
+
+            try{
+              await apiPatch(y, { [dstr]: next });
+            }catch(err){
+              alert('寫入失敗：' + err.message);
+              // 復原
+              CACHE[y][dstr] = cur;
+              td.querySelector('.state').className = 'state ' + (cur==='full'?'full':'free');
+              td.querySelector('.state').textContent = (cur==='full'?'已滿':'可售');
+              updateCounts(y,m);
+            }
+          });
+
+          row.appendChild(td);
+          // 換週
+          if((firstWd + day) % 7 === 0){
+            tbody.appendChild(row);
+            row = document.createElement('tr');
           }
-          tr.appendChild(td);
-
-          const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
         });
-        if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td);} tbody.appendChild(tr); }
-        tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
-      }
-      document.getElementById('globalCounts').textContent=`統計（3個月） 可售：${globalAvail}｜已滿：${globalFull}`;
-      setLastUpdatedNow();
+        if(row.children.length) tbody.appendChild(row);
+
+        table.appendChild(tbody);
+        cal.appendChild(table);
+        elCals.appendChild(cal);
+
+        // 初次統計
+        updateCounts(y,m);
+      });
     }
 
-    // === 修正：本地先更新 CACHE，再呼叫 API；成功後重繪 ===
-    function resetAll(){
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const todayStr = ymd(new Date());
+    function updateCounts(y,m){
+      const days = monthDays(y,m);
+      let full=0, free=0;
+      days.forEach(d=>{
+        const dstr = ymd(y,m,d);
+        const st = (CACHE[y]?.[dstr] || 'free');
+        if(st==='full') full++; else free++;
+      });
+      const el = document.getElementById(`cnt-${y}-${m}`);
+      if(el) el.textContent = `可售 ${String(free).padStart(2,'0')} • 已滿 ${String(full).padStart(2,'0')}`;
+    }
+
+    async function loadYearAndRender(){
+      const year = parseInt(elYear.value,10);
+      await apiGet(year);
+      renderCalendars();
+    }
+
+    // 事件
+    document.getElementById('btnReload').addEventListener('click', loadYearAndRender);
+    document.getElementById('btnSetSatFull').addEventListener('click', async ()=>{
+      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+      const days = monthDays(Y,M).filter(d => new Date(Y,M-1,d).getDay()===6);
       const delta = {};
-      for(let m=0;m<3;m++){
-        const mStart=addMonths(first,m); const mEnd=endOfMonth(mStart);
-        const days=rangeDays(mStart,mEnd);
-        days.forEach(d=>{ const ds=ymd(d); if(ds>=todayStr) delta[ds]='available'; });
-      }
-      CACHE[y] = { ...(CACHE[y]||{}), ...delta }; // 立即更新 UI 資料
-      apiPatch(y, delta).then(()=> renderCalendars()).catch((e)=>{ console.error(e); renderCalendars(); });
-    }
-
-    function exportExcel(){
-      const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const todayStr = ymd(new Date());
-      const wb=XLSX.utils.book_new();
-      for(let m=0;m<3;m++){
-        const mStart=addMonths(first,m); const mEnd=endOfMonth(mStart);
-        const days=rangeDays(mStart,mEnd);
-        const rows=[["日期","狀態","是否週末","說明"]];
-        days.forEach(d=>{ const ds=ymd(d); const isPast = ds < todayStr; const isR=isRedDay(selectedYear, ds); const note=isR?weekendName(ds):''; const st = isPast ? '' : (getState(selectedYear, ds)==='full'?'已滿':'可售'); rows.push([ds,st,isR?'是':'否',note]); });
-        const ws=XLSX.utils.aoa_to_sheet(rows);
-        const name = `${mStart.getFullYear()}-${String(mStart.getMonth()+1).padStart(2,'0')}`;
-        XLSX.utils.book_append_sheet(wb, ws, name);
-      }
-      XLSX.writeFile(wb,`一斗夢_空房表_${selectedYear}_三個月.xlsx`);
-    }
-
-    function setSaturdaysFull(){
-      const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const todayStr = ymd(new Date());
+      days.forEach(d=>delta[ymd(Y,M,d)]='full');
+      // 本地先套
+      CACHE[Y] = CACHE[Y] || {};
+      Object.assign(CACHE[Y], delta);
+      renderCalendars();
+      try{ await apiPatch(Y, delta); }catch(e){ alert('寫入失敗：'+e.message); }
+    });
+    document.getElementById('btnSetAllFree').addEventListener('click', async ()=>{
+      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
       const delta = {};
-      for(let m=0;m<3;m++){
-        const mStart=addMonths(first,m); const mEnd=endOfMonth(mStart);
-        const days=rangeDays(mStart,mEnd);
-        days.forEach(d=>{ if(d.getDay()===6){ const ds=ymd(d); if(ds < todayStr) return; delta[ds]='full'; } });
-      }
-      CACHE[selectedYear] = { ...(CACHE[selectedYear]||{}), ...delta }; // 立即更新 UI 資料
-      apiPatch(selectedYear, delta).then(()=>{ renderCalendars(); }).catch((e)=>{ console.error(e); renderCalendars(); });
-    }
-
-    document.getElementById('btnGenerate').onclick=renderCalendars;
-    document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
-    document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
-    document.getElementById('btnReset').onclick=resetAll;
-    document.getElementById('btnExport').onclick=exportExcel;
-    document.getElementById('btnSatFull').onclick=setSaturdaysFull;
-    document.getElementById('btnSelfTest').onclick=runSelfTests;
-
-    document.addEventListener('keydown', (e)=>{
-      const tag=(e.target && e.target.tagName)||'';
-      if(tag==='INPUT' || tag==='TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if(e.key==='ArrowLeft'){ e.preventDefault(); shiftMonths(-1); }
-      if(e.key==='ArrowRight'){ e.preventDefault(); shiftMonths(1); }
+      monthDays(Y,M).forEach(d=>delta[ymd(Y,M,d)]='free');
+      CACHE[Y] = CACHE[Y] || {};
+      Object.assign(CACHE[Y], delta);
+      renderCalendars();
+      try{ await apiPatch(Y, delta); }catch(e){ alert('寫入失敗：'+e.message); }
     });
 
-    const now=new Date();
-    const thisYear=now.getFullYear();
-    const yearSel=document.getElementById('yearSelect');
-    for(let y=thisYear; y<=thisYear+7; y++){
-      const opt=document.createElement('option'); opt.value=String(y); opt.textContent=String(y); yearSel.appendChild(opt);
-    }
-    yearSel.value=String(thisYear);
-
-    function syncStartMonthToYear(){
-      const y=parseInt(yearSel.value,10);
-      const cur=new Date();
-      const month=(y===cur.getFullYear())? (cur.getMonth()+1) : 1;
-      document.getElementById('startMonth').value=`${y}-${String(month).padStart(2,'0')}`;
-    }
-    yearSel.onchange=()=>{ syncStartMonthToYear(); renderCalendars(); };
-    syncStartMonthToYear();
-
-    function updateCounts(){ renderCalendars(); }
-    (async ()=>{
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      try{ await apiGet(y); }catch(e){ console.error(e); }
-      renderCalendars();
-      setLastUpdatedNow();
+    // 初始化
+    (async function(){
+      initSelectors();
+      document.getElementById('apiBase').textContent = API_BASE;
+      document.getElementById('apiBase').addEventListener('click', ()=>window.open(API_BASE,'_blank'));
+      await loadYearAndRender();
+      // 切換選項時，若跨年就先拉該年
+      elYear.addEventListener('change', loadYearAndRender);
+      elMonth.addEventListener('change', renderCalendars);
     })();
-
-    let LAST_TODAY = ymd(new Date());
-    function checkDayRollover(){
-      const nowStr = ymd(new Date());
-      if(nowStr !== LAST_TODAY){
-        LAST_TODAY = nowStr;
-        renderCalendars();
-        setLastUpdatedNow();
-      }
-    }
-    setInterval(checkDayRollover, 3600000);
-    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkDayRollover(); });
-
-    function assert(cond,msg){ if(!cond) throw new Error(msg||'Assertion failed'); }
-
-    function test_aoaToSheet_noSyntaxError(){
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      const base=new Date(`${y}-10-01`);
-      const mStart=startOfMonth(base); const mEnd=endOfMonth(mStart);
-      const days=rangeDays(mStart,mEnd);
-      const todayStr = ymd(new Date());
-      const rows=[["日期","狀態","是否週末","說明"]];
-      days.forEach(d=>{ const ds=ymd(d);
-          const isPast = ds < todayStr; const st=getState(y, ds)==='full'?'已滿':'可售'; const isR=isRedDay(y, ds); const note=isR?weekendName(ds):''; rows.push([ds,st,isR?'是':'否',note]); });
-      const ws=XLSX.utils.aoa_to_sheet(rows);
-      assert(!!ws['!ref'], 'XLSX 工作表未生成');
-    }
-
-    function test_toggleState(){
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      const ds=`${y}-10-10`;
-      const before=getState(y, ds);
-      toggle(y, ds);
-      const after=getState(y, ds);
-      assert(before!==after,'toggle 未改變狀態');
-      setState(y, ds, before);
-    }
-
-    function test_weekendHighlight(){
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      let sat=new Date(`${y}-01-01`);
-      while(sat.getDay()!==6) sat.setDate(sat.getDate()+1);
-      const mon=new Date(sat); mon.setDate(mon.getDate()+2);
-      assert(isRedDay(y, ymd(sat))===true, '週六應標紅');
-      assert(isRedDay(y, ymd(mon))===false, '週一不應標紅');
-    }
-
-    function test_shiftMonths(){
-      const prev=document.getElementById('startMonth').value;
-      shiftMonths(3);
-      const afterNext=document.getElementById('startMonth').value;
-      shiftMonths(-3);
-      const afterBack=document.getElementById('startMonth').value;
-      assert(prev!==afterNext, '下三個月按鈕未變更月份');
-      assert(prev===afterBack, '往返三個月後應回到原值');
-    }
-
-    function test_setSaturdaysFull(){
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const mStart=first; const mEnd=endOfMonth(mStart);
-      let sample=null; let d=new Date(mStart);
-      while(d<=mEnd){ if(d.getDay()===6){ sample=ymd(d); break; } d.setDate(d.getDate()+1); }
-      if(!sample){ return; }
-      setState(y, sample, 'available');
-      setSaturdaysFull();
-      const st=getState(y, sample);
-      assert(st==='full','一鍵週六設為已滿未生效');
-    }
-
-    function test_pastGreyAndLocked(){
-      const yday=new Date(); yday.setDate(yday.getDate()-1);
-      const y= yday.getFullYear(); const m=yday.getMonth()+1;
-      document.getElementById('yearSelect').value=String(y);
-      document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
-      renderCalendars();
-      const ds = ymd(yday);
-      const cell = Array.from(document.querySelectorAll('.day')).find(td=> td.querySelector('.num')?.textContent==String(yday.getDate()) && td.classList.contains('past'));
-      if(!cell) throw new Error('過去日期未灰階');
-      if(cell.querySelector('.badge')) throw new Error('過去日期不應顯示可售/已滿');
-    }
-
-    function runSelfTests(){
-      const results=[];
-      TEST_MODE = true;
-      function record(name,fn){ try{ fn(); results.push({name, ok:true}); }catch(e){ results.push({name, ok:false, error:e.message}); } }
-      record('Excel 轉換不應報錯', test_aoaToSheet_noSyntaxError);
-      record('切換狀態應生效', test_toggleState);
-      record('週末標紅邏輯', test_weekendHighlight);
-      record('下三個月跳轉', test_shiftMonths);
-      record('一鍵週六設為已滿', test_setSaturdaysFull);
-      record('過去日期應灰階鎖定', test_pastGreyAndLocked);
-      TEST_MODE = false;
-      renderCalendars();
-      console.table(results);
-      const box=document.getElementById('testResults');
-      box.innerHTML = results.map(r=>`<div>${r.ok?'✅':'❌'} ${r.name}${r.error? ' - '+r.error:''}</div>`).join('');
-      box.style.display='block';
-      return results;
-    }
-    window.runSelfTests = runSelfTests;
   </script>
 </body>
 </html>
