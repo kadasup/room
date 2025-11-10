@@ -14,7 +14,7 @@
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
     h2{margin:6px 0 12px;text-align:center}
     .wrap{max-width:1200px;margin:0 auto}
-    .controls{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .controls{display:grid;gap:8px;grid-template-columns:repeat(6,auto);align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     label{display:flex;gap:8px;align-items:center;color:var(--muted)}
     input[type="month"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
     button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
@@ -24,167 +24,191 @@
     .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:1}
+    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--sticky);position:sticky;top:0;z-index:1}
     .cal-title{font-weight:700}
     table{width:100%;border-collapse:separate;border-spacing:0}
-    th,td{border:1px solid var(--border);text-align:center;padding:8px;vertical-align:top}
-    thead th{background:var(--sticky)}
-    td.day{height:92px;position:relative}
-    .num{position:absolute;top:6px;left:8px;font-size:13px;color:#444}
-    .badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 8px;border-radius:999px;font-size:12px;font-weight:600}
-    .available{background:var(--ok)}
+    th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
+    thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
+    .day{border-left:1px solid var(--border);min-height:52px;vertical-align:top;position:relative}
+    .day:first-child{border-left:none}
+    .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555}
+    .state{margin-top:22px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
     .full{background:var(--bad)}
-    .redday{ background: var(--redbg); }
-    .redday .num{ color: var(--redtxt); font-weight:700 }
-    .today{ box-shadow: inset 0 0 0 3px #ff85c0; background: var(--today) }
-    .muted-text{color:#aaa}
-    .counts{font-size:13px;color:#666}
-    .footer{margin-top:10px;color:#666;font-size:12px;text-align:center}
-    .last-updated{ position:fixed; right:12px; bottom:12px; background:#fff; border:1px solid var(--border); color:#666; padding:6px 10px; border-radius:10px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.04) }
+    .available{background:var(--ok)}
+    .is-today{box-shadow: inset 0 0 0 2px #ff85c0; background:var(--today)}
+    .weekend{background:#fff8f8}
+    .muted{color:#aaa}
+    .footer{margin-top:12px;color:#666;font-size:13px}
+    .counts{font-variant-numeric:tabular-nums}
+    @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿 | 空房表（前台唯讀）</h2>
+    <h2>房況前台（唯讀）</h2>
 
-    <div class="controls" role="group" aria-label="基本設定">
-      <label>年份：
-        <select id="yearSelect" title="選擇年份"></select>
+    <div class="controls">
+      <label>年份
+        <select id="yearSelect"></select>
       </label>
-      <label>起始月份：<input type="month" id="startMonth"></label>
-      <button id="btnGenerate">重新產生</button>
-      <button id="btnPrev3" class="secondary" title="快速跳到上三個月 (← 也可切月)">◀︎ 上三個月</button>
-      <button id="btnNext3" class="secondary" title="快速跳到下三個月 (→ 也可切月)">下三個月 ▶︎</button>
-      <span class="counts" id="globalCounts" style="justify-self:end"></span>
+      <label>起始月份
+        <input id="startMonth" type="month">
+      </label>
+      <button id="btnGenerate" class="secondary">重新載入</button>
+      <button id="btnPrev3" class="secondary">← 前 3 個月</button>
+      <button id="btnNext3" class="secondary">後 3 個月 →</button>
+      <span style="justify-self:end" id="lastSync">未同步</span>
     </div>
 
     <div class="legend">
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-      <span><span class="dot" style="background:var(--redbg); border-color:#f4b4b4"></span>週末（週六/週日）</span>
+      <span><span class="dot" style="background:#fff8f8; border-color:#f4b4b4"></span>週末</span>
       <span><span class="dot" style="background:var(--today); box-shadow: inset 0 0 0 2px #ff85c0"></span>今天</span>
     </div>
 
     <div id="calendars" class="grid" aria-label="三個月月曆"></div>
-    <div class="last-updated" id="lastUpdated" aria-live="polite"></div>
-    <p class="footer">此頁為唯讀展示。若需更改房況請至後台。</p>
+
+    <div class="footer">
+      <div>API：<span id="apiBase"></span></div>
+    </div>
   </div>
 
   <script>
   (function(){
-    window.API_BASE = window.API_BASE || 'https://script.google.com/macros/s/AKfycbwyYtllJHFPsRMb8vNDyX-ADZqBG0GToXp7uT_ooZKhcFmfUqDkM4LqgHiEbeLREYY33w/exec';
-    const LABEL = '空房表';
-    const CACHE = {};
+    // ====== 必填常數（請確認與後台相同的 /exec）======
+    window.API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
+    // ================================================
 
-    function ymd(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().split('T')[0]; }
-    function startOfMonth(d){ const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; }
-    function endOfMonth(d){ const x=new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x; }
-    function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
-    function rangeDays(from,to){ const out=[]; const x=new Date(from); while(x<=to){ out.push(new Date(x)); x.setDate(x.getDate()+1);} return out; }
-    function pad2(n){ return String(n).padStart(2,'0'); }
-    function formatDateTime(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
-    function setLastUpdatedNow(){ const el=document.getElementById('lastUpdated'); if(el) el.textContent = `上次更新：${formatDateTime(new Date())}`; }
-    function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
-    function isRedDay(dateStr){ return isWeekend(new Date(dateStr)); }
-    function weekendName(dateStr){ const d=new Date(dateStr); return d.getDay()===0? '週日' : '週六'; }
+    const CACHE = {}; // { [year:number]: { 'YYYY-MM-DD': 'full'|'available' } }
+    const now = new Date();
+
+    const fmt = (d)=>d.toISOString().slice(0,10);
+    const todayStr = fmt(new Date());
+    const startOfMonth = (d)=>new Date(d.getFullYear(), d.getMonth(), 1);
+    const addMonths = (d, n)=> new Date(d.getFullYear(), d.getMonth()+n, 1);
+    const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
+
+    function setStartMonthFromDate(d){
+      const el=document.getElementById('startMonth');
+      el.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+    function getStartMonthDate(){
+      const el=document.getElementById('startMonth');
+      const [Y,M]=el.value.split('-').map(v=>parseInt(v,10));
+      return new Date(Y, M-1, 1);
+    }
+
+    function initSelectors(){
+      const elYear=document.getElementById('yearSelect');
+      const y0 = now.getFullYear()-1;
+      const y1 = now.getFullYear()+2;
+      elYear.innerHTML='';
+      for(let y=y0; y<=y1; y++){
+        const opt=document.createElement('option');
+        opt.value=String(y);
+        opt.textContent=y;
+        if(y===now.getFullYear()) opt.selected=true;
+        elYear.appendChild(opt);
+      }
+      setStartMonthFromDate(now);
+      document.getElementById('apiBase').textContent = window.API_BASE;
+    }
+
     function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
 
+    // === 這裡是關鍵改動：GET 加上 t=Date.now() + cache:'no-store' 避免快取 ===
     async function fetchYear(year){
       if(CACHE[year]) return CACHE[year];
       const u = new URL(window.API_BASE);
       u.searchParams.set('year', String(year));
-      const res = await fetch(u.toString(), { headers:{'Accept':'application/json'} });
+      u.searchParams.set('t', Date.now()); // 破快取
+      const res = await fetch(u.toString(), { headers:{'Accept':'application/json'}, cache:'no-store' });
       if(!res.ok) throw new Error('API GET failed '+res.status);
       const data = await res.json();
       CACHE[year] = data.status || {};
+      document.getElementById('lastSync').textContent = '讀取於 ' + new Date().toLocaleString();
       return CACHE[year];
     }
 
     function renderCalendars(){
       const holder=document.getElementById('calendars');
       holder.innerHTML='';
-      const selectedYear=parseInt(document.getElementById('yearSelect').value,10);
-      const base = getStartMonthDate();
-      const first = startOfMonth(base);
-      const todayStr = ymd(new Date());
 
-      let globalAvail=0, globalFull=0;
+      const first = getStartMonthDate();
+      const months = [0,1,2].map(k=>{
+        let y=first.getFullYear(), m=first.getMonth()+1+k;
+        if(m>12){ y += Math.floor((m-1)/12); m = ((m-1)%12)+1; }
+        return {y, m};
+      });
 
-      for(let m=0;m<3;m++){
-        const mStart = addMonths(first,m);
-        const mEnd = endOfMonth(mStart);
-        const lead = mStart.getDay();
-        const days = rangeDays(mStart,mEnd);
+      months.forEach(({y,m})=>{
+        const cal = document.createElement('div');
+        cal.className = 'calendar';
 
-        const cal=document.createElement('div'); cal.className='calendar';
-        cal.innerHTML=`<div class="cal-head"><div class="cal-title">${mStart.getFullYear()} 年 ${mStart.getMonth()+1} 月｜${LABEL}</div></div>`;
+        const head = document.createElement('div');
+        head.className = 'cal-head';
+        head.innerHTML = `<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;
+        cal.appendChild(head);
 
-        const tbl=document.createElement('table');
-        const thead=document.createElement('thead');
-        const trh=document.createElement('tr');
-        '日,一,二,三,四,五,六'.split(',').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; trh.appendChild(th); });
-        thead.appendChild(trh); tbl.appendChild(thead);
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        thead.innerHTML = `<tr>
+          <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th>
+        </tr>`;
+        table.appendChild(thead);
 
-        const tbody=document.createElement('tbody');
-        let tr=document.createElement('tr');
-        for(let i=0;i<lead;i++){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td); }
+        const tbody = document.createElement('tbody');
+        const firstWd = (new Date(y,m-1,1).getDay()+6)%7; // Monday first
+        const lastDay = new Date(y,m,0).getDate();
 
-        days.forEach((d,idx)=>{
-          const td=document.createElement('td'); td.className='day';
-          const ds=ymd(d);
-          const isPast = false;
-          if(isRedDay(ds)) td.classList.add('redday');
-          const today=new Date(); if(ymd(today)===ds) td.classList.add('today');
-          const num=document.createElement('div'); num.className='num'; num.textContent=d.getDate();
-          if(isRedDay(ds)) num.title = weekendName(ds);
-          td.appendChild(num);
+        let row = document.createElement('tr');
+        for(let i=0;i<firstWd;i++) row.appendChild(document.createElement('td'));
 
-          const badge=document.createElement('div');
-          const st=getState(mStart.getFullYear(), ds);
-          badge.className='badge '+st; badge.textContent=(st==='full'?'已滿':'可售');
-          td.appendChild(badge);
-          if(st==='full') globalFull++; else globalAvail++;
+        let fullCount=0, freeCount=0;
 
-          tr.appendChild(td);
-          const dow=(lead+idx)%7; if(dow===6){ tbody.appendChild(tr); tr=document.createElement('tr'); }
-        });
-        if(tr.children.length){ while(tr.children.length<7){ const td=document.createElement('td'); td.className='day muted-text'; tr.appendChild(td);} tbody.appendChild(tr); }
-        tbl.appendChild(tbody); cal.appendChild(tbl); holder.appendChild(cal);
-      }
-      document.getElementById('globalCounts').textContent=`統計（3個月） 可售：${globalAvail}｜已滿：${globalFull}`;
-      setLastUpdatedNow();
-    }
+        for(let d=1; d<=lastDay; d++){
+          const td = document.createElement('td');
+          td.className = 'day' + (isWeekend(y,m,d)?' weekend':'');
+          const dstr = ymd(y,m,d);
+          const state = getState(y, dstr); // 'full'|'available'
+          if(state==='full') fullCount++; else freeCount++;
 
-    function getStartMonthDate(){
-      const val=document.getElementById('startMonth').value;
-      if(val){ const [y,m]=val.split('-').map(Number); return new Date(y, m-1, 1); }
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      return new Date(y, 0, 1);
-    }
-    function setStartMonthFromDate(date){
-      const y=date.getFullYear(); const m=date.getMonth()+1;
-      const yearSel=document.getElementById('yearSelect');
-      if(y!==parseInt(yearSel.value,10)){
-        const first=+yearSel.options[0].value; const last=+yearSel.options[yearSel.options.length-1].value;
-        const target = Math.min(Math.max(y, first), last);
-        yearSel.value=String(target);
-      }
-      document.getElementById('startMonth').value=`${y}-${String(m).padStart(2,'0')}`;
+          td.innerHTML = `
+            <span class="dateNo">${d}</span>
+            <span class="state ${state==='full'?'full':'available'}">${state==='full'?'已滿':'可售'}</span>
+          `;
+          if(dstr===todayStr) td.classList.add('is-today');
+
+          row.appendChild(td);
+          if((firstWd + d) % 7 === 0){
+            tbody.appendChild(row);
+            row = document.createElement('tr');
+          }
+        }
+        if(row.children.length) tbody.appendChild(row);
+
+        table.appendChild(tbody);
+        cal.appendChild(table);
+        holder.appendChild(cal);
+
+        const el = document.getElementById(`cnt-${y}-${m}`);
+        if(el) el.textContent = `可售 ${String(freeCount).padStart(2,'0')} • 已滿 ${String(fullCount).padStart(2,'0')}`;
+      });
     }
 
     async function ensureYearsLoaded(years){
-      const tasks = years.filter(y => !CACHE[y]).map(y => fetchYear(y).catch(console.error));
-      if(tasks.length) await Promise.all(tasks);
+      for(const y of years){ await fetchYear(y); }
     }
 
-    async function shiftMonths(n){
+    function shiftMonths(n){
       const prev = getStartMonthDate();
       const next = addMonths(prev, n);
       setStartMonthFromDate(next);
       const needYears = new Set();
       for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(next), m).getFullYear()); }
-      await ensureYearsLoaded([...needYears]);
-      renderCalendars();
+      ensureYearsLoaded([...needYears]).then(renderCalendars);
     }
 
     document.getElementById('btnGenerate').onclick = async ()=>{
@@ -195,27 +219,18 @@
     document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
     document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
 
-    const now=new Date();
-    const thisYear=now.getFullYear();
-    const yearSel=document.getElementById('yearSelect');
-    for(let y=thisYear-1; y<=thisYear+7; y++){
-      const opt=document.createElement('option'); opt.value=String(y); opt.textContent=String(y); yearSel.appendChild(opt);
-    }
-    yearSel.value=String(thisYear);
-    yearSel.onchange = async ()=>{
-      const y=parseInt(yearSel.value,10);
-      setStartMonthFromDate(new Date(y, (y===thisYear? now.getMonth():0), 1));
-      await ensureYearsLoaded([y]);
-      renderCalendars();
-    };
-    setStartMonthFromDate(now);
+    function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 
-    (async ()=>{
+    // 初始化
+    (function init(){
+      initSelectors();
       const first = getStartMonthDate();
       const needYears = new Set();
       for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
-      await ensureYearsLoaded([...needYears]);
-      renderCalendars();
+      (async ()=>{
+        await ensureYearsLoaded([...needYears]);
+        renderCalendars();
+      })();
     })();
   })();
   </script>
