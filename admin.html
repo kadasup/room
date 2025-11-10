@@ -7,7 +7,9 @@
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#ffe6ef; --today:#fff0f6; --border:#dcdcdc; --sticky:#ffffffee;
+      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#ffe6ef;
+      --today:#fff8d6;               /* 今日：淡黃色 */
+      --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
@@ -28,17 +30,47 @@
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
     thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
-    .day{cursor:pointer;border-left:1px solid var(--border);min-height:56px;vertical-align:top;position:relative;background:#fff}
+
+    .day{
+      cursor:pointer;
+      border-left:1px solid var(--border);
+      min-height:56px;
+      vertical-align:top;
+      position:relative;
+      background:#fff;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-start;
+    }
     .day:first-child{border-left:none}
     .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555}
     .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
+
     .state{margin-top:24px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
     .full{background:var(--bad)}
     .free{background:var(--ok)}
-    .is-today{background:var(--today)}
-    .weekend{background:var(--pink)} /* 週六、日粉紅底 */
+
+    .is-today{background:var(--today)}  /* 今日淡黃底 */
+    .weekend{background:var(--pink)}     /* 週六、日粉紅底 */
     .muted{color:#aaa}
-    .past{opacity:.6; pointer-events:none} /* 今日之前不可點選/設定 */
+
+    /* 今日之前：不可點、狀態不顯示且版面不塌陷 */
+    .past{
+      opacity:.6;
+      pointer-events:none;
+      min-height:56px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+    }
+    .past .dateNo{
+      position:static;
+      font-size:12px;
+      color:#aaa;
+      margin-top:6px;
+    }
+
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
     .notice{color:#d32f2f;font-weight:600}
@@ -70,7 +102,7 @@
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
       <span><span class="dot" style="background:var(--pink); border-color:#f4b4b4"></span>週末</span>
-      <span class="chip"><span class="today-dot"></span> 今天</span>
+      <span class="chip"><span class="today-dot"></span> 今天（淡黃）</span>
       <span class="chip muted">灰色日期不可設定 & 狀態不顯示</span>
     </div>
 
@@ -84,7 +116,7 @@
 
   <script>
     // ====== 必填常數（請確認是同一個 /exec）======
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbwyYtllJHFPsRMb8vNDyX-ADZqBG0GToXp7uT_ooZKhcFmfUqDkM4LqgHiEbeLREYY33w/exec';
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
     const ADMIN_TOKEN = '1234567890';
     // =============================================
 
@@ -210,9 +242,7 @@
             + (isToday?' is-today':'')
             + (isPast?' past muted':'');
 
-          // 週末粉紅底：已在 .weekend 樣式
-          // 今日之前：狀態不顯示（空白）；不可點
-          // 今日：右上紅點
+          // 內容：日期號、今日紅點、未來/今日才顯示狀態
           let inner = `<span class="dateNo">${day}</span>`;
           if (isToday) inner += `<span class="today-dot"></span>`;
           if (!isPast) {
