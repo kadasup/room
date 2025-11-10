@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表（前台唯讀・防重複宣告版）</title>
+  <title>一斗夢包棟民宿 | 空房表1110（前台唯讀・防快取）</title>
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
@@ -118,7 +118,7 @@
 
     function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
 
-    // === 這裡是關鍵改動：GET 加上 t=Date.now() + cache:'no-store' 避免快取 ===
+    // === 關鍵：GET 加上 t=Date.now() + cache:'no-store' 避免快取 ===
     async function fetchYear(year){
       if(CACHE[year]) return CACHE[year];
       const u = new URL(window.API_BASE);
@@ -219,18 +219,14 @@
     document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
     document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
 
-    function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
-
     // 初始化
-    (function init(){
+    (async function init(){
       initSelectors();
       const first = getStartMonthDate();
       const needYears = new Set();
       for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
-      (async ()=>{
-        await ensureYearsLoaded([...needYears]);
-        renderCalendars();
-      })();
+      await ensureYearsLoaded([...needYears]);
+      renderCalendars();
     })();
   })();
   </script>
