@@ -13,7 +13,7 @@
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
     h2{margin:6px 0 12px;text-align:center}
     .wrap{max-width:1100px;margin:0 auto}
-    .controls{display:grid;grid-template-columns:repeat(6,auto);gap:8px;align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .controls{display:grid;grid-template-columns:repeat(8,auto);gap:8px;align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     label{display:flex;gap:8px;align-items:center;color:var(--muted)}
     input[type="month"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
     button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
@@ -28,15 +28,17 @@
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
     thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
-    .day{cursor:pointer;border-left:1px solid var(--border);min-height:52px;vertical-align:top;position:relative}
+    .day{cursor:pointer;border-left:1px solid var(--border);min-height:56px;vertical-align:top;position:relative}
     .day:first-child{border-left:none}
     .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555}
-    .state{margin-top:22px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
+    .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
+    .state{margin-top:24px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
     .full{background:var(--bad)}
     .free{background:var(--ok)}
-    .is-today{box-shadow: inset 0 0 0 2px #ff85c0; background:var(--today)}
+    .is-today{background:var(--today)}
     .weekend{background:#fff8f8}
     .muted{color:#aaa}
+    .past{opacity:.6; pointer-events:none} /* 今日之前不可點選/設定 */
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
     .notice{color:#d32f2f;font-weight:600}
@@ -47,7 +49,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h2>房況後台（API 版）</h2>
+    <h2>房況後台1110-2（API 版）</h2>
 
     <div class="controls">
       <label>年份
@@ -56,6 +58,8 @@
       <label>起始月份
         <input id="startMonth" type="month">
       </label>
+      <button id="btnPrev3" class="secondary">← 前 3 個月</button>
+      <button id="btnNext3" class="secondary">後 3 個月 →</button>
       <button id="btnReload" class="secondary">重新載入</button>
       <button id="btnSetSatFull" class="secondary">本月週六→已滿</button>
       <button id="btnSetAllFree" class="secondary">本月全部→可售</button>
@@ -66,7 +70,8 @@
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
       <span><span class="dot" style="background:#fff8f8; border-color:#f4b4b4"></span>週末</span>
-      <span><span class="dot" style="background:var(--today); box-shadow: inset 0 0 0 2px #ff85c0"></span>今天</span>
+      <span class="chip"><span class="today-dot"></span> 今天</span>
+      <span class="chip muted">灰色日期不可設定</span>
     </div>
 
     <div id="calendars" class="grid" aria-label="三個月月曆"></div>
@@ -79,7 +84,7 @@
 
   <script>
     // ====== 必填常數（請確認是同一個 /exec）======
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbwyYtllJHFPsRMb8vNDyX-ADZqBG0GToXp7uT_ooZKhcFmfUqDkM4LqgHiEbeLREYY33w/exec';
     const ADMIN_TOKEN = '1234567890';
     // =============================================
 
@@ -89,8 +94,10 @@
     // 工具
     const fmt = (d)=>d.toISOString().slice(0,10);
     const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
     const todayStr = fmt(new Date());
+    const startOfMonth = (d)=>new Date(d.getFullYear(), d.getMonth(), 1);
+    const addMonths = (d, n)=> new Date(d.getFullYear(), d.getMonth()+n, 1);
+    const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
 
     // ===== API GET：帶防快取 =====
     async function apiGet(year){
@@ -174,56 +181,68 @@
 
         const table = document.createElement('table');
         const thead = document.createElement('thead');
+        // 1) 週起始改為「周日」
         thead.innerHTML = `<tr>
-          <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th>
+          <th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th>
         </tr>`;
         table.appendChild(thead);
 
         const tbody = document.createElement('tbody');
-        // 以周為列
-        const firstWd = (new Date(y,m-1,1).getDay()+6)%7; // Monday first
+        // 周日為 0 的原生 getDay()
+        const firstWd = new Date(y,m-1,1).getDay(); // 0=Sun..6=Sat
         const days = monthDays(y,m);
         let row = document.createElement('tr');
         for(let i=0;i<firstWd;i++) row.appendChild(document.createElement('td'));
+
         let fullCount=0, freeCount=0;
 
         days.forEach(day=>{
           const td = document.createElement('td');
-          td.className = 'day' + (isWeekend(y,m,day)?' weekend':'');
           const dstr = ymd(y,m,day);
           const state = (CACHE[y]?.[dstr] || 'free'); // 預設可售
+          const isPast = dstr < todayStr; // 2) 今日之前不可操作
+          const isToday = dstr === todayStr;
+
+          td.className = 'day' 
+            + (isWeekend(y,m,day)?' weekend':'')
+            + (isToday?' is-today':'')
+            + (isPast?' past muted':'');
+
           if(state==='full') fullCount++; else freeCount++;
 
           td.innerHTML = `
             <span class="dateNo">${day}</span>
+            ${isToday?'<span class="today-dot"></span>':''}  <!-- 3) 今日小紅點 -->
             <span class="state ${state==='full'?'full':'free'}">${state==='full'?'已滿':'可售'}</span>
           `;
-          if(dstr===todayStr) td.classList.add('is-today');
 
-          td.addEventListener('click', async ()=>{
-            const cur = (CACHE[y]?.[dstr] || 'free');
-            const next = cur==='full' ? 'free' : 'full';
-            // 先本地更新（立即有感）
-            CACHE[y] = CACHE[y] || {};
-            CACHE[y][dstr] = next;
-            td.querySelector('.state').className = 'state ' + (next==='full'?'full':'free');
-            td.querySelector('.state').textContent = (next==='full'?'已滿':'可售');
-            updateCounts(y,m);
-
-            try{
-              await apiPatch(y, { [dstr]: next });
-            }catch(err){
-              alert('寫入失敗：' + err.message);
-              // 復原
-              CACHE[y][dstr] = cur;
-              td.querySelector('.state').className = 'state ' + (cur==='full'?'full':'free');
-              td.querySelector('.state').textContent = (cur==='full'?'已滿':'可售');
+          // 2) 今日之前不可點：不綁定事件
+          if(!isPast){
+            td.addEventListener('click', async ()=>{
+              const cur = (CACHE[y]?.[dstr] || 'free');
+              const next = cur==='full' ? 'free' : 'full';
+              // 先本地更新（立即有感）
+              CACHE[y] = CACHE[y] || {};
+              CACHE[y][dstr] = next;
+              td.querySelector('.state').className = 'state ' + (next==='full'?'full':'free');
+              td.querySelector('.state').textContent = (next==='full'?'已滿':'可售');
               updateCounts(y,m);
-            }
-          });
+
+              try{
+                await apiPatch(y, { [dstr]: next });
+              }catch(err){
+                alert('寫入失敗：' + err.message);
+                // 復原
+                CACHE[y][dstr] = cur;
+                td.querySelector('.state').className = 'state ' + (cur==='full'?'full':'free');
+                td.querySelector('.state').textContent = (cur==='full'?'已滿':'可售');
+                updateCounts(y,m);
+              }
+            });
+          }
 
           row.appendChild(td);
-          // 換週
+          // 換週（周日=0 起算）
           if((firstWd + day) % 7 === 0){
             tbody.appendChild(row);
             row = document.createElement('tr');
@@ -252,29 +271,64 @@
       if(el) el.textContent = `可售 ${String(free).padStart(2,'0')} • 已滿 ${String(full).padStart(2,'0')}`;
     }
 
+    async function ensureYearsLoadedForView(){
+      // 4) 新增前/後三個月按鍵會跨年，先把畫面涉及的年份都拉好
+      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+      const years = new Set();
+      for(let k=0;k<3;k++){
+        let y=Y, m=M+k;
+        if(m>12){ y += Math.floor((m-1)/12); }
+        years.add(y);
+      }
+      for(const y of years){ await apiGet(y); }
+    }
+
     async function loadYearAndRender(){
-      const year = parseInt(elYear.value,10);
-      await apiGet(year);
+      await ensureYearsLoadedForView();
       renderCalendars();
+    }
+
+    // 前/後三個月
+    function shiftMonths(n){
+      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+      const base = new Date(Y, M-1, 1);
+      const next = addMonths(base, n);
+      elMonth.value = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}`;
+      loadYearAndRender();
     }
 
     // 事件
     document.getElementById('btnReload').addEventListener('click', loadYearAndRender);
+    document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3)); // 4) 新增
+    document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));  // 4) 新增
+
     document.getElementById('btnSetSatFull').addEventListener('click', async ()=>{
       const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
-      const days = monthDays(Y,M).filter(d => new Date(Y,M-1,d).getDay()===6);
+      // 2) 批次也需避開今日之前
+      const days = monthDays(Y,M).filter(d => {
+        const ds = ymd(Y,M,d);
+        return new Date(Y,M-1,d).getDay()===6 && ds >= todayStr;
+      });
+      if(!days.length){ alert('本月週六（含今日以前）無可設定的日期'); return; }
+
       const delta = {};
       days.forEach(d=>delta[ymd(Y,M,d)]='full');
-      // 本地先套
       CACHE[Y] = CACHE[Y] || {};
       Object.assign(CACHE[Y], delta);
       renderCalendars();
       try{ await apiPatch(Y, delta); }catch(e){ alert('寫入失敗：'+e.message); }
     });
+
     document.getElementById('btnSetAllFree').addEventListener('click', async ()=>{
       const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+      // 2) 批次避開今日之前
       const delta = {};
-      monthDays(Y,M).forEach(d=>delta[ymd(Y,M,d)]='free');
+      monthDays(Y,M).forEach(d=>{
+        const ds = ymd(Y,M,d);
+        if(ds >= todayStr) delta[ds]='free';
+      });
+      if(Object.keys(delta).length===0){ alert('本月（含今日以前）無可設定的日期'); return; }
+
       CACHE[Y] = CACHE[Y] || {};
       Object.assign(CACHE[Y], delta);
       renderCalendars();
@@ -287,9 +341,9 @@
       document.getElementById('apiBase').textContent = API_BASE;
       document.getElementById('apiBase').addEventListener('click', ()=>window.open(API_BASE,'_blank'));
       await loadYearAndRender();
-      // 切換選項時，若跨年就先拉該年
+      // 切換年份/月份
       elYear.addEventListener('change', loadYearAndRender);
-      elMonth.addEventListener('change', renderCalendars);
+      elMonth.addEventListener('change', loadYearAndRender);
     })();
   </script>
 </body>
