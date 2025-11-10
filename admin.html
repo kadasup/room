@@ -88,7 +88,7 @@
 
     // === API 版設定 ===
     const SHEET_ID = '1sWSZIq3BpEh9UHgLYovRBexe7dIFs6cTOPsub5G1sbI';
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbyG0fc24V4gRiFyHYb2Uxo5W4asc6ojsnEHI85sE5BPloFKIeR5618T0LP3649VztA5hQ/exec';
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbwyYtllJHFPsRMb8vNDyX-ADZqBG0GToXp7uT_ooZKhcFmfUqDkM4LqgHiEbeLREYY33w/exec';
     const ADMIN_TOKEN = '1234567890';
     let TEST_MODE = false;
 
@@ -104,13 +104,17 @@
       return CACHE[year];
     }
     async function apiPatch(year, delta){
-      if(TEST_MODE) return { ok:true, skipped:true };
-      const res = await fetch(API_BASE, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+ADMIN_TOKEN }, body: JSON.stringify({ year, delta }) });
-      if(!res.ok) throw new Error('API POST failed '+res.status);
-      const out = await res.json();
-      CACHE[year] = out?.data?.status || { ...(CACHE[year]||{}), ...delta }; // 後端若未回傳最新狀態，至少合併本地 delta
-      return out;
-    }
+  if(TEST_MODE) return { ok:true, skipped:true };
+  const res = await fetch(API_BASE, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ token: ADMIN_TOKEN, year, delta }) // ← 加上 token
+  });
+  if(!res.ok) throw new Error('API POST failed '+res.status);
+  const out = await res.json();
+  CACHE[year] = out?.data?.status || { ...(CACHE[year]||{}), ...delta };
+  return out;
+}
 
     function storageKey(year){ return `vacancy-calendar-${year}`; }
     function getSaved(year){ return CACHE[year] || {}; }
