@@ -31,11 +31,11 @@
     th,td{border-bottom:1px solid var(--border);padding:0;text-align:center}
     thead th{padding:8px 6px;font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
 
-    /* ✅ 恢復 table 佈局，固定高度，避免跑版 */
+    /* 固定高度 + 絕對定位，避免跑版 */
     .day{
       cursor:pointer;
       border-left:1px solid var(--border);
-      height:76px;                /* 固定單格高度 */
+      height:88px;                /* 原 76px → 88px，留更多空間 */
       vertical-align:top;
       position:relative;
       background:#fff;
@@ -46,6 +46,7 @@
       position:absolute;
       left:6px; top:6px;
       font-size:12px; color:#555;
+      z-index:2;                 /* 確保不被徽章蓋到 */
     }
     .today-dot{
       position:absolute;
@@ -54,15 +55,17 @@
       background:#e53935; box-shadow:0 0 0 2px #fff;
     }
 
-    /* 狀態徽章放到底部中央，不影響列高 */
+    /* 徽章縮小、靠底部，不影響列高 */
     .state{
       position:absolute; left:50%; transform:translateX(-50%);
-      bottom:8px;
+      bottom:6px;                    /* 原 8px → 6px */
       display:inline-block;
-      padding:6px 8px;
+      padding:4px 6px;               /* 原 6x8 → 4x6 */
       border-radius:8px;
       border:1px solid var(--border);
       font-weight:600;
+      font-size:12px;                /* 新增：縮小字級 */
+      line-height:1.1;               /* 新增：降低高度 */
     }
     .full{background:var(--bad)}
     .free{background:var(--ok)}
@@ -82,7 +85,12 @@
     .notice{color:#d32f2f;font-weight:600}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff}
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
+
     @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
+    @media (max-width: 480px){
+      .day{ height:84px; }
+      .state{ font-size:11px; padding:3px 6px; bottom:6px; }
+    }
   </style>
 </head>
 <body>
@@ -194,12 +202,28 @@
       return Array.from({length:last}, (_,i)=>i+1);
     }
 
+    async function ensureYearsLoadedForView(){
+      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+      const years = new Set();
+      for(let k=0;k<3;k++){
+        let y=Y, m=M+k;
+        if(m>12){ y += Math.floor((m-1)/12); }
+        years.add(y);
+      }
+      for(const y of years){ await apiGet(y); }
+    }
+
+    // 包 try/catch 的載入流程
+    async function loadYearAndRender(){
+      await ensureYearsLoadedForView();
+      renderCalendars();
+    }
+
     function renderCalendars(){
       let [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
       const minY = parseInt(elMonth.min.split('-')[0],10);
       const minM = parseInt(elMonth.min.split('-')[1],10);
 
-      // 安全：若當前值小於 min，拉回 min
       if (Y < minY || (Y===minY && M<minM)) {
         Y = minY; M = minM;
         elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
@@ -323,28 +347,7 @@
       for(const y of years){ await apiGet(y); }
     }
 
-    // ✅ 包 try/catch，錯誤丟給呼叫者處理
-    async function loadYearAndRender(){
-      await ensureYearsLoadedForView();
-      renderCalendars();
-    }
-
-    // 前/後三個月（不可退到今天以前）
-    function shiftMonths(n){
-      const min = elMonth.min.split('-').map(v=>parseInt(v,10));
-      const minDate = new Date(min[0], min[1]-1, 1);
-
-      const cur = elMonth.value.split('-').map(v=>parseInt(v,10));
-      let base = new Date(cur[0], cur[1]-1, 1);
-      base.setMonth(base.getMonth() + n);
-
-      if (base < minDate) base = minDate; // 卡住不讓往過去
-      elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
-      // 呼叫「重新載入」流程，保證體驗一致
-      reloadNow();
-    }
-
-    // ✅ 「重新載入」按鈕：顯示進度、錯誤、避免連點
+    // 重新載入：顯示進度、錯誤、避免連點
     async function reloadNow(){
       const btn = document.getElementById('btnReload');
       const last = document.getElementById('lastSync');
@@ -362,6 +365,20 @@
         btn.disabled = false;
         btn.textContent = '重新載入';
       }
+    }
+
+    // 前/後三個月（不可退到今天以前）
+    function shiftMonths(n){
+      const min = elMonth.min.split('-').map(v=>parseInt(v,10));
+      const minDate = new Date(min[0], min[1]-1, 1);
+
+      const cur = elMonth.value.split('-').map(v=>parseInt(v,10));
+      let base = new Date(cur[0], cur[1]-1, 1);
+      base.setMonth(base.getMonth() + n);
+
+      if (base < minDate) base = minDate; // 卡住不讓往過去
+      elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
+      reloadNow();
     }
 
     // 事件
