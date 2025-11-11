@@ -35,7 +35,7 @@
     .day{
       cursor:pointer;
       border-left:1px solid var(--border);
-      height:88px;                /* 原 76px → 88px，留更多空間 */
+      height:120px;               /* 留出大型徽章空間 */
       vertical-align:top;
       position:relative;
       background:#fff;
@@ -46,7 +46,7 @@
       position:absolute;
       left:6px; top:6px;
       font-size:12px; color:#555;
-      z-index:2;                 /* 確保不被徽章蓋到 */
+      z-index:2;                  /* 確保不被徽章蓋到 */
     }
     .today-dot{
       position:absolute;
@@ -55,22 +55,26 @@
       background:#e53935; box-shadow:0 0 0 2px #fff;
     }
 
-    /* 徽章縮小、靠底部，不影響列高 */
+    /* 直排大型徽章，置中貼底 */
     .state{
       position:absolute; left:50%; transform:translateX(-50%);
-      bottom:6px;                    /* 原 8px → 6px */
-      display:inline-block;
-      padding:4px 6px;               /* 原 6x8 → 4x6 */
-      border-radius:8px;
+      bottom:10px;
+      width:64px;
+      height:78px;
+      display:flex; align-items:center; justify-content:center;
+      padding:0;
+      border-radius:14px;
       border:1px solid var(--border);
-      font-weight:600;
-      font-size:12px;                /* 新增：縮小字級 */
-      line-height:1.1;               /* 新增：降低高度 */
+      font-weight:700;
+      font-size:18px;
+      line-height:1.1;
+      writing-mode: vertical-rl;
+      text-orientation: upright;
     }
-    .full{background:var(--bad)}
-    .free{background:var(--ok)}
+    .full{ background:var(--bad); }
+    .free{ background:var(--ok); }
 
-    .is-today{background:var(--today)}  /* 今日淡黃底 */
+    .is-today{background:var(--today)}   /* 今日淡黃底 */
     .weekend{background:var(--pink)}     /* 週六、日粉紅底 */
     .muted{color:#aaa}
 
@@ -88,8 +92,8 @@
 
     @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
     @media (max-width: 480px){
-      .day{ height:84px; }
-      .state{ font-size:11px; padding:3px 6px; bottom:6px; }
+      .day{ height:110px; }
+      .state{ width:58px; height:70px; font-size:16px; bottom:8px; }
     }
   </style>
 </head>
@@ -213,7 +217,6 @@
       for(const y of years){ await apiGet(y); }
     }
 
-    // 包 try/catch 的載入流程
     async function loadYearAndRender(){
       await ensureYearsLoadedForView();
       renderCalendars();
@@ -267,7 +270,7 @@
           const isPast = dstr < todayStr;
           const isToday = dstr === todayStr;
 
-          td.className = 'day'
+        td.className = 'day'
             + (isWeekend(y,m,day)?' weekend':'')
             + (isToday?' is-today':'')
             + (isPast?' past muted':'');
@@ -334,17 +337,6 @@
       });
       const el = document.getElementById(`cnt-${y}-${m}`);
       if(el) el.textContent = `可售 ${String(free).padStart(2,'0')} • 已滿 ${String(full).padStart(2,'0')}`;
-    }
-
-    async function ensureYearsLoadedForView(){
-      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
-      const years = new Set();
-      for(let k=0;k<3;k++){
-        let y=Y, m=M+k;
-        if(m>12){ y += Math.floor((m-1)/12); }
-        years.add(y);
-      }
-      for(const y of years){ await apiGet(y); }
     }
 
     // 重新載入：顯示進度、錯誤、避免連點
