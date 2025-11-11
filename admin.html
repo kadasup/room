@@ -7,8 +7,8 @@
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#ffe6ef;
-      --today:#fff8d6;              /* 今日：淡黃色 */
+      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;   /* 週末底色對齊網站 */
+      --today:#fff8d6;                                /* 今日淡黃底（保留你的設定） */
       --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
@@ -27,61 +27,57 @@
     .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
     .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--sticky);position:sticky;top:0;z-index:1}
     .cal-title{font-weight:700}
-    table{width:100%;border-collapse:separate;border-spacing:0}
-    th,td{border-bottom:1px solid var(--border);padding:0;text-align:center}
-    thead th{padding:8px 6px;font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
 
-    /* 固定高度 + 絕對定位，避免跑版 */
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
+    thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
+
+    /* ↘ 尺寸對齊你提供的網站 */
     .day{
-      cursor:pointer;
       border-left:1px solid var(--border);
-      height:120px;               /* 留出大型徽章空間 */
+      min-height:52px;            /* 對齊：小巧格高 */
       vertical-align:top;
       position:relative;
       background:#fff;
+      cursor:pointer;
     }
     .day:first-child{border-left:none}
+    .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555;z-index:2}
 
-    .dateNo{
-      position:absolute;
-      left:6px; top:6px;
-      font-size:12px; color:#555;
-      z-index:2;                  /* 確保不被徽章蓋到 */
-    }
-    .today-dot{
-      position:absolute;
-      right:6px; top:6px;
-      width:8px; height:8px; border-radius:50%;
-      background:#e53935; box-shadow:0 0 0 2px #fff;
-    }
-
-    /* 直排大型徽章，置中貼底 */
+    /* 小型膠囊徽章（與網站一致：6×8 padding、字重 600、距離日期約 22px） */
     .state{
-      position:absolute; left:50%; transform:translateX(-50%);
-      bottom:10px;
-      width:64px;
-      height:78px;
-      display:flex; align-items:center; justify-content:center;
-      padding:0;
-      border-radius:14px;
+      margin-top:22px;
+      display:inline-block;
+      padding:6px 8px;
+      border-radius:8px;
       border:1px solid var(--border);
-      font-weight:700;
-      font-size:18px;
+      font-weight:600;
       line-height:1.1;
-      writing-mode: vertical-rl;
-      text-orientation: upright;
     }
-    .full{ background:var(--bad); }
-    .free{ background:var(--ok); }
+    .full{background:var(--bad)}
+    .free{background:var(--ok)}
 
-    .is-today{background:var(--today)}   /* 今日淡黃底 */
-    .weekend{background:var(--pink)}     /* 週六、日粉紅底 */
+    /* 今日樣式（保留你需求的淡黃＋紅點） */
+    .is-today{background:var(--today)}
+    .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
+
+    /* 週末底色 */
+    .weekend{background:var(--pink)}
     .muted{color:#aaa}
 
-    /* 今日之前：禁用與半透明（不渲染狀態），保持表格高度一致 */
-    .past{
-      opacity:.6;
-      pointer-events:none;
+    /* 今日之前：不可點、不顯示狀態，但用 :after 佔位讓列高一致 */
+    .past{opacity:.6; pointer-events:none}
+    .past .state{display:none}
+    .past::after{
+      content:"佔位";             /* 文字隱形，只做高度佔位 */
+      visibility:hidden;
+      display:inline-block;
+      margin-top:22px;
+      padding:6px 8px;
+      border:1px solid transparent;
+      border-radius:8px;
+      font-weight:600;
+      line-height:1.1;
     }
 
     .footer{margin-top:12px;color:#666;font-size:13px}
@@ -89,12 +85,7 @@
     .notice{color:#d32f2f;font-weight:600}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff}
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
-
     @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
-    @media (max-width: 480px){
-      .day{ height:110px; }
-      .state{ width:58px; height:70px; font-size:16px; bottom:8px; }
-    }
   </style>
 </head>
 <body>
@@ -144,7 +135,6 @@
     const fmt = (d)=>d.toISOString().slice(0,10);
     const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const todayStr = fmt(new Date());
-    const startOfMonth = (d)=>new Date(d.getFullYear(), d.getMonth(), 1);
     const addMonths = (d, n)=> new Date(d.getFullYear(), d.getMonth()+n, 1);
     const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
 
@@ -185,7 +175,6 @@
       const curYear = now.getFullYear();
       const y1 = curYear + 2;
 
-      // 年份：從今年開始（不顯示今天以前的年份）
       elYear.innerHTML = '';
       for(let y=curYear; y<=y1; y++){
         const opt = document.createElement('option');
@@ -195,7 +184,6 @@
         elYear.appendChild(opt);
       }
 
-      // 月份：設最小值為「今年-本月」
       const minMonth = `${curYear}-${String(now.getMonth()+1).padStart(2,'0')}`;
       elMonth.min = minMonth;
       elMonth.value = minMonth;
@@ -250,7 +238,6 @@
 
         const table = document.createElement('table');
         const thead = document.createElement('thead');
-        // 週起始＝周日
         thead.innerHTML = `<tr>
           <th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th>
         </tr>`;
@@ -270,17 +257,16 @@
           const isPast = dstr < todayStr;
           const isToday = dstr === todayStr;
 
-        td.className = 'day'
+          td.className = 'day'
             + (isWeekend(y,m,day)?' weekend':'')
             + (isToday?' is-today':'')
             + (isPast?' past muted':'');
 
-          // 內容：日期號、今日紅點、未來/今日才顯示狀態
-          let inner = `<span class="dateNo">${day}</span>`;
-          if (isToday) inner += `<span class="today-dot"></span>`;
+          let inner = `<span class=\"dateNo\">${day}</span>`;
+          if (isToday) inner += `<span class=\"today-dot\"></span>`;
           if (!isPast) {
             const state = (CACHE[y]?.[dstr] || 'free');
-            inner += `<span class="state ${state==='full'?'full':'free'}">${state==='full'?'已滿':'可售'}</span>`;
+            inner += `<span class=\"state ${state==='full'?'full':'free'}\">${state==='full'?'已滿':'可售'}</span>`;
           }
           td.innerHTML = inner;
 
@@ -288,7 +274,6 @@
             td.addEventListener('click', async ()=>{
               const cur = (CACHE[y]?.[dstr] || 'free');
               const next = cur==='full' ? 'free' : 'full';
-              // 先本地更新
               CACHE[y] = CACHE[y] || {};
               CACHE[y][dstr] = next;
               const s = td.querySelector('.state');
@@ -300,7 +285,6 @@
                 await apiPatch(y, { [dstr]: next });
               }catch(err){
                 alert('寫入失敗：' + err.message);
-                // 復原
                 CACHE[y][dstr] = cur;
                 s.className = 'state ' + (cur==='full'?'full':'free');
                 s.textContent = (cur==='full'?'已滿':'可售');
@@ -310,7 +294,6 @@
           }
 
           row.appendChild(td);
-          // 換週（周日=0）
           if((firstWd + day) % 7 === 0){
             tbody.appendChild(row);
             row = document.createElement('tr');
@@ -359,7 +342,6 @@
       }
     }
 
-    // 前/後三個月（不可退到今天以前）
     function shiftMonths(n){
       const min = elMonth.min.split('-').map(v=>parseInt(v,10));
       const minDate = new Date(min[0], min[1]-1, 1);
@@ -368,7 +350,7 @@
       let base = new Date(cur[0], cur[1]-1, 1);
       base.setMonth(base.getMonth() + n);
 
-      if (base < minDate) base = minDate; // 卡住不讓往過去
+      if (base < minDate) base = minDate;
       elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
       reloadNow();
     }
