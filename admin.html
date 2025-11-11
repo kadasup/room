@@ -8,7 +8,7 @@
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
       --ok:#c8e6c9; --bad:#ffcdd2; --pink:#ffe6ef;
-      --today:#fff8d6;               /* 今日：淡黃色 */
+      --today:#fff8d6;              /* 今日：淡黃色 */
       --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
@@ -28,26 +28,42 @@
     .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--sticky);position:sticky;top:0;z-index:1}
     .cal-title{font-weight:700}
     table{width:100%;border-collapse:separate;border-spacing:0}
-    th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
-    thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
+    th,td{border-bottom:1px solid var(--border);padding:0;text-align:center}
+    thead th{padding:8px 6px;font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
 
+    /* ✅ 恢復 table 佈局，固定高度，避免跑版 */
     .day{
       cursor:pointer;
       border-left:1px solid var(--border);
-      min-height:56px;
+      height:76px;                /* 固定單格高度 */
       vertical-align:top;
       position:relative;
       background:#fff;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:flex-start;
     }
     .day:first-child{border-left:none}
-    .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555}
-    .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
 
-    .state{margin-top:24px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
+    .dateNo{
+      position:absolute;
+      left:6px; top:6px;
+      font-size:12px; color:#555;
+    }
+    .today-dot{
+      position:absolute;
+      right:6px; top:6px;
+      width:8px; height:8px; border-radius:50%;
+      background:#e53935; box-shadow:0 0 0 2px #fff;
+    }
+
+    /* 狀態徽章放到底部中央，不影響列高 */
+    .state{
+      position:absolute; left:50%; transform:translateX(-50%);
+      bottom:8px;
+      display:inline-block;
+      padding:6px 8px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      font-weight:600;
+    }
     .full{background:var(--bad)}
     .free{background:var(--ok)}
 
@@ -55,20 +71,10 @@
     .weekend{background:var(--pink)}     /* 週六、日粉紅底 */
     .muted{color:#aaa}
 
-    /* 今日之前：不可點、狀態不顯示且版面不塌陷 */
+    /* 今日之前：禁用與半透明（不渲染狀態），保持表格高度一致 */
     .past{
       opacity:.6;
       pointer-events:none;
-      min-height:56px;
-      display:flex;
-      align-items:flex-start;
-      justify-content:center;
-    }
-    .past .dateNo{
-      position:static;
-      font-size:12px;
-      color:#aaa;
-      margin-top:6px;
     }
 
     .footer{margin-top:12px;color:#666;font-size:13px}
@@ -317,6 +323,7 @@
       for(const y of years){ await apiGet(y); }
     }
 
+    // ✅ 包 try/catch，錯誤丟給呼叫者處理
     async function loadYearAndRender(){
       await ensureYearsLoadedForView();
       renderCalendars();
@@ -333,11 +340,32 @@
 
       if (base < minDate) base = minDate; // 卡住不讓往過去
       elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
-      loadYearAndRender();
+      // 呼叫「重新載入」流程，保證體驗一致
+      reloadNow();
+    }
+
+    // ✅ 「重新載入」按鈕：顯示進度、錯誤、避免連點
+    async function reloadNow(){
+      const btn = document.getElementById('btnReload');
+      const last = document.getElementById('lastSync');
+      try{
+        btn.disabled = true;
+        btn.textContent = '重新載入中…';
+        if(last) last.textContent = '重新載入中…';
+        await loadYearAndRender();
+        if(last) last.textContent = '讀取於 ' + new Date().toLocaleString();
+      }catch(err){
+        console.error(err);
+        alert('重新載入失敗：' + (err?.message || err));
+        if(last) last.textContent = '讀取失敗';
+      }finally{
+        btn.disabled = false;
+        btn.textContent = '重新載入';
+      }
     }
 
     // 事件
-    document.getElementById('btnReload').addEventListener('click', loadYearAndRender);
+    document.getElementById('btnReload').addEventListener('click', reloadNow);
     document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3));
     document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));
 
@@ -376,8 +404,8 @@
       document.getElementById('apiBase').textContent = API_BASE;
       document.getElementById('apiBase').addEventListener('click', ()=>window.open(API_BASE,'_blank'));
       await loadYearAndRender();
-      elYear.addEventListener('change', loadYearAndRender);
-      elMonth.addEventListener('change', loadYearAndRender);
+      elYear.addEventListener('change', reloadNow);
+      elMonth.addEventListener('change', reloadNow);
     })();
   </script>
 </body>
