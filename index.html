@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>一斗夢包棟民宿 | 空房表1110（前台唯讀・防快取）</title>
+  <title>一斗夢包棟民宿 | 房況前台（唯讀）</title>
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --redbg:#fdecea; --redtxt:#c62828; --today:#fff0f6; --border:#dcdcdc;
-      --sticky:#ffffffee;
+      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
+      --today:#fff8d6; --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
@@ -29,15 +29,31 @@
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
     thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
-    .day{border-left:1px solid var(--border);min-height:52px;vertical-align:top;position:relative}
+
+    .day{border-left:1px solid var(--border);min-height:52px;vertical-align:top;position:relative;background:#fff}
     .day:first-child{border-left:none}
-    .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555}
-    .state{margin-top:22px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600}
+    .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555;z-index:2}
+
+    .state{margin-top:22px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600;line-height:1.1}
     .full{background:var(--bad)}
     .available{background:var(--ok)}
-    .is-today{box-shadow: inset 0 0 0 2px #ff85c0; background:var(--today)}
-    .weekend{background:#fff8f8}
+
+    /* 可點撥號的狀態樣式（hover 提示） */
+    .clickable{cursor:pointer; box-shadow:0 0 0 0 rgba(0,0,0,0); transition:box-shadow .15s ease}
+    .clickable:hover{box-shadow:0 0 0 3px rgba(19,99,223,.15)}
+
+    .is-today{background:var(--today)}
+    .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
+    .weekend{background:var(--pink)}
     .muted{color:#aaa}
+
+    /* 今日之前不顯示狀態但維持格高 */
+    .past{opacity:.6;pointer-events:none}
+    .past .state{display:none}
+    .past::after{
+      content:"佔位";visibility:hidden;display:inline-block;margin-top:22px;padding:6px 8px;border:1px solid transparent;border-radius:8px;font-weight:600;line-height:1.1;
+    }
+
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
     @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
@@ -63,7 +79,7 @@
     <div class="legend">
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-      <span><span class="dot" style="background:#fff8f8; border-color:#f4b4b4"></span>週末</span>
+      <span><span class="dot" style="background:var(--pink); border-color:#f4b4b4"></span>週末</span>
       <span><span class="dot" style="background:var(--today); box-shadow: inset 0 0 0 2px #ff85c0"></span>今天</span>
     </div>
 
@@ -76,125 +92,80 @@
 
   <script>
   (function(){
-    // ====== 必填常數（請確認與後台相同的 /exec）======
-    window.API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
-    // ================================================
+    // === 常數 ===
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
+    const PHONE = '0905385388'; // 可售點擊撥號
+    const AUTO_REFRESH_MS = 30000;
 
-    const CACHE = {}; // { [year:number]: { 'YYYY-MM-DD': 'full'|'available' } }
-    const now = new Date();
+    const CACHE = {}; const now = new Date();
+    const fmt=(d)=>d.toISOString().slice(0,10); const todayStr=fmt(new Date());
+    const startOfMonth=(d)=>new Date(d.getFullYear(), d.getMonth(), 1);
+    const addMonths=(d,n)=>new Date(d.getFullYear(), d.getMonth()+n,1);
+    const ymd=(y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isWeekend=(y,m,day)=>{const wd=new Date(y,m-1,day).getDay();return wd===0||wd===6;};
 
-    const fmt = (d)=>d.toISOString().slice(0,10);
-    const todayStr = fmt(new Date());
-    const startOfMonth = (d)=>new Date(d.getFullYear(), d.getMonth(), 1);
-    const addMonths = (d, n)=> new Date(d.getFullYear(), d.getMonth()+n, 1);
-    const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
-
-    function setStartMonthFromDate(d){
-      const el=document.getElementById('startMonth');
-      el.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    }
-    function getStartMonthDate(){
-      const el=document.getElementById('startMonth');
-      const [Y,M]=el.value.split('-').map(v=>parseInt(v,10));
-      return new Date(Y, M-1, 1);
-    }
-
+    function setStartMonthFromDate(d){document.getElementById('startMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+    function getStartMonthDate(){const el=document.getElementById('startMonth');const [Y,M]=el.value.split('-').map(v=>parseInt(v,10));return new Date(Y,M-1,1);}
     function initSelectors(){
-      const elYear=document.getElementById('yearSelect');
-      const y0 = now.getFullYear()-1;
-      const y1 = now.getFullYear()+2;
-      elYear.innerHTML='';
-      for(let y=y0; y<=y1; y++){
-        const opt=document.createElement('option');
-        opt.value=String(y);
-        opt.textContent=y;
-        if(y===now.getFullYear()) opt.selected=true;
-        elYear.appendChild(opt);
-      }
-      setStartMonthFromDate(now);
-      document.getElementById('apiBase').textContent = window.API_BASE;
+      const elYear=document.getElementById('yearSelect');const y0=now.getFullYear()-1;const y1=now.getFullYear()+2;
+      elYear.innerHTML='';for(let y=y0;y<=y1;y++){const opt=document.createElement('option');opt.value=String(y);opt.textContent=y;if(y===now.getFullYear())opt.selected=true;elYear.appendChild(opt);}
+      setStartMonthFromDate(now);document.getElementById('apiBase').textContent=API_BASE;
     }
+    function getState(year,ds){return(CACHE[year]&&CACHE[year][ds]==='full')?'full':'available';}
 
-    function getState(year,ds){ return (CACHE[year] && CACHE[year][ds]==='full') ? 'full':'available'; }
-
-    // === 關鍵：GET 加上 t=Date.now() + cache:'no-store' 避免快取 ===
+    // GET 防快取
     async function fetchYear(year){
-      if(CACHE[year]) return CACHE[year];
-      const u = new URL(window.API_BASE);
-      u.searchParams.set('year', String(year));
-      u.searchParams.set('t', Date.now()); // 破快取
-      const res = await fetch(u.toString(), { headers:{'Accept':'application/json'}, cache:'no-store' });
-      if(!res.ok) throw new Error('API GET failed '+res.status);
-      const data = await res.json();
-      CACHE[year] = data.status || {};
-      document.getElementById('lastSync').textContent = '讀取於 ' + new Date().toLocaleString();
+      const u=new URL(API_BASE);u.searchParams.set('year',String(year));u.searchParams.set('t',Date.now());
+      const res=await fetch(u.toString(),{headers:{'Accept':'application/json'},cache:'no-store'});
+      if(!res.ok)throw new Error('API GET failed '+res.status);
+      const data=await res.json();CACHE[year]=data.status||{};
+      document.getElementById('lastSync').textContent='讀取於 '+new Date().toLocaleString();
       return CACHE[year];
     }
 
     function renderCalendars(){
-      const holder=document.getElementById('calendars');
-      holder.innerHTML='';
-
-      const first = getStartMonthDate();
-      const months = [0,1,2].map(k=>{
-        let y=first.getFullYear(), m=first.getMonth()+1+k;
-        if(m>12){ y += Math.floor((m-1)/12); m = ((m-1)%12)+1; }
-        return {y, m};
-      });
-
+      const holder=document.getElementById('calendars');holder.innerHTML='';
+      const first=getStartMonthDate();const months=[0,1,2].map(k=>{let y=first.getFullYear(),m=first.getMonth()+1+k;if(m>12){y+=Math.floor((m-1)/12);m=((m-1)%12)+1;}return{y,m};});
       months.forEach(({y,m})=>{
-        const cal = document.createElement('div');
-        cal.className = 'calendar';
+        const cal=document.createElement('div');cal.className='calendar';
+        const head=document.createElement('div');head.className='cal-head';head.innerHTML=`<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;cal.appendChild(head);
+        const table=document.createElement('table');const thead=document.createElement('thead');
+        thead.innerHTML=`<tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr>`;table.appendChild(thead);
+        const tbody=document.createElement('tbody');const firstWd=new Date(y,m-1,1).getDay();const lastDay=new Date(y,m,0).getDate();
+        let row=document.createElement('tr');for(let i=0;i<firstWd;i++)row.appendChild(document.createElement('td'));
+        let fullCount=0,freeCount=0;
+        for(let d=1;d<=lastDay;d++){
+          const td=document.createElement('td');const dstr=ymd(y,m,d);const isPast=dstr<todayStr;const isToday=dstr===todayStr;
+          td.className='day'+(isWeekend(y,m,d)?' weekend':'')+(isToday?' is-today':'')+(isPast?' past muted':'');
+          let inner=`<span class="dateNo">${d}</span>`;if(isToday)inner+=`<span class="today-dot"></span>`;
+          if(!isPast){
+            const state=getState(y,dstr);
+            const cls=state==='full'?'full':'available';
+            const label=state==='full'?'已滿':'可售';
+            // 可售 → 可點撥號
+            const clickable = (state==='available');
+            inner+=`<span class="state ${cls} ${clickable?'clickable':''}" ${clickable?`role="button" aria-label="撥打 ${PHONE}" data-tel="1"`:''}>${label}</span>`;
+            if(state==='full') fullCount++; else freeCount++;
+          }
+          td.innerHTML=inner;
 
-        const head = document.createElement('div');
-        head.className = 'cal-head';
-        head.innerHTML = `<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;
-        cal.appendChild(head);
-
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        thead.innerHTML = `<tr>
-          <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th>
-        </tr>`;
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-        const firstWd = (new Date(y,m-1,1).getDay()+6)%7; // Monday first
-        const lastDay = new Date(y,m,0).getDate();
-
-        let row = document.createElement('tr');
-        for(let i=0;i<firstWd;i++) row.appendChild(document.createElement('td'));
-
-        let fullCount=0, freeCount=0;
-
-        for(let d=1; d<=lastDay; d++){
-          const td = document.createElement('td');
-          td.className = 'day' + (isWeekend(y,m,d)?' weekend':'');
-          const dstr = ymd(y,m,d);
-          const state = getState(y, dstr); // 'full'|'available'
-          if(state==='full') fullCount++; else freeCount++;
-
-          td.innerHTML = `
-            <span class="dateNo">${d}</span>
-            <span class="state ${state==='full'?'full':'available'}">${state==='full'?'已滿':'可售'}</span>
-          `;
-          if(dstr===todayStr) td.classList.add('is-today');
+          // 事件：僅對可售啟用撥號
+          if(!isPast){
+            td.addEventListener('click', (ev)=>{
+              const tag = ev.target;
+              // 只有點到 "可售" 徽章才撥號（避免誤觸整格）
+              if(tag && tag.matches('.state.available.clickable')){
+                window.location.href = `tel:${PHONE}`;
+              }
+            });
+          }
 
           row.appendChild(td);
-          if((firstWd + d) % 7 === 0){
-            tbody.appendChild(row);
-            row = document.createElement('tr');
-          }
+          if((firstWd + d) % 7 === 0){tbody.appendChild(row);row=document.createElement('tr');}
         }
-        if(row.children.length) tbody.appendChild(row);
-
-        table.appendChild(tbody);
-        cal.appendChild(table);
-        holder.appendChild(cal);
-
-        const el = document.getElementById(`cnt-${y}-${m}`);
-        if(el) el.textContent = `可售 ${String(freeCount).padStart(2,'0')} • 已滿 ${String(fullCount).padStart(2,'0')}`;
+        if(row.children.length)tbody.appendChild(row);
+        table.appendChild(tbody);cal.appendChild(table);holder.appendChild(cal);
+        const el=document.getElementById(`cnt-${y}-${m}`);if(el)el.textContent=`可售 ${String(freeCount).padStart(2,'0')} • 已滿 ${String(fullCount).padStart(2,'0')}`;
       });
     }
 
@@ -202,31 +173,39 @@
       for(const y of years){ await fetchYear(y); }
     }
 
-    function shiftMonths(n){
-      const prev = getStartMonthDate();
-      const next = addMonths(prev, n);
-      setStartMonthFromDate(next);
-      const needYears = new Set();
-      for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(next), m).getFullYear()); }
-      ensureYearsLoaded([...needYears]).then(renderCalendars);
+    async function reloadNow(){
+      const first=getStartMonthDate();
+      const needYears=new Set();
+      for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(first),m).getFullYear()); }
+      await ensureYearsLoaded([...needYears]);
+      renderCalendars();
     }
 
-    document.getElementById('btnGenerate').onclick = async ()=>{
-      const y=parseInt(document.getElementById('yearSelect').value,10);
-      await ensureYearsLoaded([y]);
-      renderCalendars();
-    };
+    function shiftMonths(n){
+      const prev=getStartMonthDate();
+      const next=addMonths(prev,n);
+      setStartMonthFromDate(next);
+      reloadNow();
+    }
+
+    // 手動事件
+    document.getElementById('btnGenerate').onclick=reloadNow;
     document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
     document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
+
+    // 自動每 30 秒刷新（避免重入）
+    let refreshing=false;
+    setInterval(async ()=>{
+      if(refreshing) return;
+      refreshing=true;
+      try{ await reloadNow(); }catch(e){ console.error(e); }
+      refreshing=false;
+    }, AUTO_REFRESH_MS);
 
     // 初始化
     (async function init(){
       initSelectors();
-      const first = getStartMonthDate();
-      const needYears = new Set();
-      for(let m=0;m<3;m++){ needYears.add(addMonths(first, m).getFullYear()); }
-      await ensureYearsLoaded([...needYears]);
-      renderCalendars();
+      await reloadNow();
     })();
   })();
   </script>
