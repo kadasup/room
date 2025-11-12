@@ -14,12 +14,11 @@
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
     h2{margin:6px 0 12px;text-align:center}
     .wrap{max-width:1200px;margin:0 auto}
-    .controls{display:grid;gap:8px;grid-template-columns:repeat(6,auto);align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .controls{display:grid;gap:8px;grid-template-columns:repeat(8,auto);align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
     label{display:flex;gap:8px;align-items:center;color:var(--muted)}
     input[type="month"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
-    button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
-    button:hover{background:var(--brand-600)}
-    .secondary{background:#e9eefb;color:#0f2d62}
+    button{padding:10px 14px;background:#e9eefb;border:none;color:#0f2d62;border-radius:10px;cursor:pointer;font-weight:600}
+    button:hover{background:#dfe7fb}
     .legend{display:flex;gap:12px;align-items:center;font-size:14px;color:#444;margin:6px 0 14px}
     .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -54,7 +53,10 @@
 
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
-    @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
+    @media (max-width: 960px){
+      .grid{grid-template-columns:1fr}
+      .controls{grid-template-columns:1fr 1fr;row-gap:10px}
+    }
   </style>
 </head>
 <body>
@@ -68,9 +70,13 @@
       <label>起始月份
         <input id="startMonth" type="month">
       </label>
-      <button id="btnReload" class="secondary">重新載入</button>
-      <button id="btnPrev3" class="secondary">← 前 3 個月</button>
-      <button id="btnNext3" class="secondary">後 3 個月 →</button>
+
+      <!-- 按鈕順序：前 3 個月、後 3 個月、今天、重新整理 -->
+      <button id="btnPrev3">← 前 3 個月</button>
+      <button id="btnNext3">後 3 個月 →</button>
+      <button id="btnToday">今天</button>
+      <button id="btnReload">重新整理</button>
+
       <span style="justify-self:end" id="lastSync">未同步</span>
     </div>
 
@@ -102,13 +108,31 @@
     const ymd=(y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const isWeekend=(y,m,day)=>{const wd=new Date(y,m-1,day).getDay();return wd===0||wd===6;};
 
-    function setStartMonthFromDate(d){document.getElementById('startMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
-    function getStartMonthDate(){const el=document.getElementById('startMonth');const [Y,M]=el.value.split('-').map(v=>parseInt(v,10));return new Date(Y,M-1,1);}
-    function initSelectors(){
-      const elYear=document.getElementById('yearSelect');const y0=now.getFullYear()-1;const y1=now.getFullYear()+2;
-      elYear.innerHTML='';for(let y=y0;y<=y1;y++){const opt=document.createElement('option');opt.value=String(y);opt.textContent=y;if(y===now.getFullYear())opt.selected=true;elYear.appendChild(opt);}
-      setStartMonthFromDate(now);document.getElementById('apiBase').textContent=API_BASE;
+    function setStartMonthFromDate(d){
+      document.getElementById('startMonth').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     }
+    function getStartMonthDate(){
+      const el=document.getElementById('startMonth');
+      const [Y,M]=el.value.split('-').map(v=>parseInt(v,10));
+      return new Date(Y, M-1, 1);
+    }
+
+    function initSelectors(){
+      const elYear=document.getElementById('yearSelect');
+      const cur=now.getFullYear();
+      const y1=cur+2; // 顯示今年 ~ +2 年
+      elYear.innerHTML='';
+      for(let y=cur; y<=y1; y++){          // ✅ 不再顯示今年以前
+        const opt=document.createElement('option');
+        opt.value=String(y);
+        opt.textContent=y;
+        if(y===cur) opt.selected=true;
+        elYear.appendChild(opt);
+      }
+      setStartMonthFromDate(now);
+      document.getElementById('apiBase').textContent=API_BASE;
+    }
+
     function getState(year,ds){return(CACHE[year]&&CACHE[year][ds]==='full')?'full':'available';}
 
     // 強制 GET 最新（破快取）
@@ -169,20 +193,20 @@
       const btn=document.getElementById('btnReload');
       const last=document.getElementById('lastSync');
       try{
-        if(btn){btn.disabled=true;btn.textContent='重新載入中…';}
-        if(last){last.textContent='重新載入中…';}
+        if(btn){btn.disabled=true;btn.textContent='重新整理中…';}
+        if(last){last.textContent='重新整理中…';}
         const first=getStartMonthDate();
         const needYears=new Set();
         for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(first),m).getFullYear()); }
-        for(const y of needYears){ await fetchYear(y); }   // 每次都強制抓新資料
+        for(const y of needYears){ await fetchYear(y); }   // 每次都抓新資料
         renderCalendars();
         if(last){last.textContent='讀取於 '+new Date().toLocaleString();}
       }catch(e){
         console.error(e);
-        alert('重新載入失敗：'+(e?.message||e));
+        alert('重新整理失敗：'+(e?.message||e));
         if(last){last.textContent='讀取失敗';}
       }finally{
-        if(btn){btn.disabled=false;btn.textContent='重新載入';}
+        if(btn){btn.disabled=false;btn.textContent='重新整理';}
       }
     }
 
@@ -191,11 +215,18 @@
       setStartMonthFromDate(next);
       reloadNow();
     }
+    function goToday(){
+      setStartMonthFromDate(new Date());
+      reloadNow();
+    }
 
     // 手動事件
     document.getElementById('btnReload').onclick=reloadNow;
     document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
     document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
+    document.getElementById('btnToday').onclick=goToday;
+    document.getElementById('yearSelect').addEventListener('change', reloadNow);
+    document.getElementById('startMonth').addEventListener('change', reloadNow);
 
     // 自動每 30 秒刷新（避免重入）
     let refreshing=false;
@@ -208,10 +239,7 @@
 
     // 初始化
     (async function init(){
-      const elYear=document.getElementById('yearSelect');
       initSelectors();
-      elYear.addEventListener('change', reloadNow);
-      document.getElementById('startMonth').addEventListener('change', reloadNow);
       await reloadNow();
     })();
   })();
