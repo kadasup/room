@@ -191,7 +191,7 @@
             const cls=state==='full'?'full':'available';
             const label=state==='full'?'已滿':'可售';
             const clickable = (state==='available');
-            inner+=`<span class="state ${cls} ${clickable?'clickable':''}" ${clickable?`role="button" aria-label="撥打 0905385388" data-tel="1"`:''}>${label}</span>`;
+            inner+=`<span class="state ${cls} ${clickable?'clickable':''}" ${clickable?`role="button" aria-label="撥打 ${PHONE}" data-tel="1"`:''}>${label}</span>`;
             if(state==='full') fullCount++; else freeCount++;
           }
           td.innerHTML=inner;
@@ -200,7 +200,7 @@
             td.addEventListener('click',(ev)=>{
               const tag=ev.target;
               if(tag && tag.matches('.state.available.clickable')){
-                window.location.href=`tel:0905385388`;
+                window.location.href=`tel:${PHONE}`;
               }
             });
           }
@@ -230,7 +230,7 @@
         }
         for(const y of years){ await fetchYear(y); }
         renderCalendars();
-        if(last){last.textContent='讀取於 '+new Date().toLocaleString());}
+        if(last){last.textContent='讀取於 '+new Date().toLocaleString();}  <!-- ← 修正：移除多餘 ) -->
       }catch(e){
         console.error(e);
         alert('重新整理失敗：'+(e?.message||e));
