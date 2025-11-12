@@ -6,7 +6,7 @@
   <title>一斗夢包棟民宿 | 房況前台（唯讀）</title>
   <style>
     :root{
-      --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
+      --bg:#f7f8fa; --fg:#222; --muted:#666;
       --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
       --today:#fff8d6; --border:#dcdcdc; --sticky:#ffffffee;
     }
@@ -36,7 +36,7 @@
     .state{margin-top:22px;display:inline-block;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-weight:600;line-height:1.1}
     .full{background:var(--bad)}
     .available{background:var(--ok)}
-    .clickable{cursor:pointer; box-shadow:0 0 0 0 rgba(0,0,0,0); transition:box-shadow .15s ease}
+    .clickable{cursor:pointer; transition:box-shadow .15s ease}
     .clickable:hover{box-shadow:0 0 0 3px rgba(19,99,223,.15)}
 
     .is-today{background:var(--today)}
@@ -53,10 +53,7 @@
 
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
-    @media (max-width: 960px){
-      .grid{grid-template-columns:1fr}
-      .controls{grid-template-columns:1fr 1fr;row-gap:10px}
-    }
+    @media (max-width:960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px} }
   </style>
 </head>
 <body>
@@ -98,39 +95,60 @@
   (function(){
     // === 常數 ===
     const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
-    const PHONE = '0905385388';       // 點「可售」撥號
-    const AUTO_REFRESH_MS = 30000;    // 30 秒自動刷新
+    const PHONE = '0905385388';
+    const AUTO_REFRESH_MS = 30000;
 
-    const CACHE = {}; const now = new Date();
-    const fmt=(d)=>d.toISOString().slice(0,10); const todayStr=fmt(new Date());
+    // 時間邊界：今天所在月份 ~ 未來 12 個月（含）
+    const NOW = new Date();
+    const MIN_DATE = new Date(NOW.getFullYear(), NOW.getMonth(), 1);
+    const MAX_DATE = new Date(NOW.getFullYear(), NOW.getMonth() + 11, 1); // 到 11 個月後的當月
+
+    const CACHE = {};
+    const fmt=(d)=>d.toISOString().slice(0,10);
+    const todayStr=fmt(new Date());
     const startOfMonth=(d)=>new Date(d.getFullYear(), d.getMonth(), 1);
-    const addMonths=(d,n)=>new Date(d.getFullYear(), d.getMonth()+n,1);
+    const addMonths=(d,n)=>new Date(d.getFullYear(), d.getMonth()+n, 1);
     const ymd=(y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const isWeekend=(y,m,day)=>{const wd=new Date(y,m-1,day).getDay();return wd===0||wd===6;};
 
+    // 工具：限制起始月份在 [MIN_DATE, MAX_DATE]
+    function clampMonth(d){
+      const s = startOfMonth(d);
+      if(s < MIN_DATE) return new Date(MIN_DATE);
+      if(s > MAX_DATE) return new Date(MAX_DATE);
+      return s;
+    }
+
     function setStartMonthFromDate(d){
-      document.getElementById('startMonth').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const el = document.getElementById('startMonth');
+      const s = clampMonth(d);
+      el.value = `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}`;
     }
     function getStartMonthDate(){
       const el=document.getElementById('startMonth');
       const [Y,M]=el.value.split('-').map(v=>parseInt(v,10));
-      return new Date(Y, M-1, 1);
+      return clampMonth(new Date(Y, M-1, 1));
     }
 
     function initSelectors(){
       const elYear=document.getElementById('yearSelect');
-      const cur=now.getFullYear();
-      const y1=cur+2; // 顯示今年 ~ +2 年
+      const curY = MIN_DATE.getFullYear();
+      const maxY = MAX_DATE.getFullYear(); // ✅ 只到未來一年
       elYear.innerHTML='';
-      for(let y=cur; y<=y1; y++){          // ✅ 不再顯示今年以前
+      for(let y=curY; y<=maxY; y++){
         const opt=document.createElement('option');
-        opt.value=String(y);
-        opt.textContent=y;
-        if(y===cur) opt.selected=true;
+        opt.value=String(y); opt.textContent=y;
+        if(y===curY) opt.selected=true;
         elYear.appendChild(opt);
       }
-      setStartMonthFromDate(now);
-      document.getElementById('apiBase').textContent=API_BASE;
+
+      // month input：卡住範圍（無法選之前月份，也無法超過一年）
+      const elMonth = document.getElementById('startMonth');
+      elMonth.min = `${MIN_DATE.getFullYear()}-${String(MIN_DATE.getMonth()+1).padStart(2,'0')}`;
+      elMonth.max = `${MAX_DATE.getFullYear()}-${String(MAX_DATE.getMonth()+1).padStart(2,'0')}`;
+
+      setStartMonthFromDate(NOW);
+      document.getElementById('apiBase').textContent = API_BASE;
     }
 
     function getState(year,ds){return(CACHE[year]&&CACHE[year][ds]==='full')?'full':'available';}
@@ -147,8 +165,15 @@
 
     function renderCalendars(){
       const holder=document.getElementById('calendars');holder.innerHTML='';
-      const first=getStartMonthDate();
-      const months=[0,1,2].map(k=>{let y=first.getFullYear(),m=first.getMonth()+1+k;if(m>12){y+=Math.floor((m-1)/12);m=((m-1)%12)+1;}return{y,m};});
+      // 以起始月份起，最多顯示 3 個月，但不超過 MAX_DATE
+      let base = getStartMonthDate();
+      const months = [];
+      for(let k=0;k<3;k++){
+        const d = addMonths(base, k);
+        if(d > MAX_DATE) break;          // 超過一年就不再顯示
+        months.push({y:d.getFullYear(), m:d.getMonth()+1});
+      }
+
       months.forEach(({y,m})=>{
         const cal=document.createElement('div');cal.className='calendar';
         const head=document.createElement('div');head.className='cal-head';head.innerHTML=`<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;cal.appendChild(head);
@@ -166,7 +191,7 @@
             const cls=state==='full'?'full':'available';
             const label=state==='full'?'已滿':'可售';
             const clickable = (state==='available');
-            inner+=`<span class="state ${cls} ${clickable?'clickable':''}" ${clickable?`role="button" aria-label="撥打 ${PHONE}" data-tel="1"`:''}>${label}</span>`;
+            inner+=`<span class="state ${cls} ${clickable?'clickable':''}" ${clickable?`role="button" aria-label="撥打 0905385388" data-tel="1"`:''}>${label}</span>`;
             if(state==='full') fullCount++; else freeCount++;
           }
           td.innerHTML=inner;
@@ -175,7 +200,7 @@
             td.addEventListener('click',(ev)=>{
               const tag=ev.target;
               if(tag && tag.matches('.state.available.clickable')){
-                window.location.href=`tel:${PHONE}`;
+                window.location.href=`tel:0905385388`;
               }
             });
           }
@@ -195,12 +220,17 @@
       try{
         if(btn){btn.disabled=true;btn.textContent='重新整理中…';}
         if(last){last.textContent='重新整理中…';}
-        const first=getStartMonthDate();
-        const needYears=new Set();
-        for(let m=0;m<3;m++){ needYears.add(addMonths(startOfMonth(first),m).getFullYear()); }
-        for(const y of needYears){ await fetchYear(y); }   // 每次都抓新資料
+        // 依當前三個月需求抓取對應年份（卡 1 年範圍）
+        let base = getStartMonthDate();
+        const years=new Set();
+        for(let k=0;k<3;k++){
+          const d=addMonths(base,k);
+          if(d>MAX_DATE) break;
+          years.add(d.getFullYear());
+        }
+        for(const y of years){ await fetchYear(y); }
         renderCalendars();
-        if(last){last.textContent='讀取於 '+new Date().toLocaleString();}
+        if(last){last.textContent='讀取於 '+new Date().toLocaleString());}
       }catch(e){
         console.error(e);
         alert('重新整理失敗：'+(e?.message||e));
@@ -211,14 +241,11 @@
     }
 
     function shiftMonths(n){
-      const prev=getStartMonthDate(); const next=addMonths(prev,n);
-      setStartMonthFromDate(next);
+      let base = addMonths(getStartMonthDate(), n);
+      setStartMonthFromDate(base);  // 會自動 clamp 到 [MIN, MAX]
       reloadNow();
     }
-    function goToday(){
-      setStartMonthFromDate(new Date());
-      reloadNow();
-    }
+    function goToday(){ setStartMonthFromDate(NOW); reloadNow(); }
 
     // 手動事件
     document.getElementById('btnReload').onclick=reloadNow;
@@ -226,7 +253,11 @@
     document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
     document.getElementById('btnToday').onclick=goToday;
     document.getElementById('yearSelect').addEventListener('change', reloadNow);
-    document.getElementById('startMonth').addEventListener('change', reloadNow);
+    document.getElementById('startMonth').addEventListener('change', ()=>{
+      // 使用者手改（如鍵盤輸入），也強制 clamp
+      setStartMonthFromDate(getStartMonthDate());
+      reloadNow();
+    });
 
     // 自動每 30 秒刷新（避免重入）
     let refreshing=false;
