@@ -44,7 +44,6 @@
     .weekend{background:var(--pink)}
     .muted{color:#aaa}
 
-    /* 今日之前不顯示狀態但維持格高 */
     .past{opacity:.6;pointer-events:none}
     .past .state{display:none}
     .past::after{
@@ -67,13 +66,10 @@
       <label>起始月份
         <input id="startMonth" type="month">
       </label>
-
-      <!-- 按鈕順序：前 3 個月、後 3 個月、今天、重新整理 -->
       <button id="btnPrev3">← 前 3 個月</button>
       <button id="btnNext3">後 3 個月 →</button>
       <button id="btnToday">今天</button>
       <button id="btnReload">重新整理</button>
-
       <span style="justify-self:end" id="lastSync">未同步</span>
     </div>
 
@@ -93,17 +89,19 @@
 
   <script>
   (function(){
-    // === 常數 ===
     const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
     const PHONE = '0905385388';
     const AUTO_REFRESH_MS = 30000;
 
-    // 時間邊界：今天所在月份 ~ 未來 12 個月（含）
+    // 範圍：從本月開始僅顯示未來一年
     const NOW = new Date();
     const MIN_DATE = new Date(NOW.getFullYear(), NOW.getMonth(), 1);
-    const MAX_DATE = new Date(NOW.getFullYear(), NOW.getMonth() + 11, 1); // 到 11 個月後的當月
+    const MAX_DATE = new Date(NOW.getFullYear(), NOW.getMonth()+11, 1);
 
     const CACHE = {};
+    let lastViewHash = '';
+    let pendingGetAbort = null;
+
     const fmt=(d)=>d.toISOString().slice(0,10);
     const todayStr=fmt(new Date());
     const startOfMonth=(d)=>new Date(d.getFullYear(), d.getMonth(), 1);
@@ -111,14 +109,12 @@
     const ymd=(y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const isWeekend=(y,m,day)=>{const wd=new Date(y,m-1,day).getDay();return wd===0||wd===6;};
 
-    // 工具：限制起始月份在 [MIN_DATE, MAX_DATE]
     function clampMonth(d){
       const s = startOfMonth(d);
       if(s < MIN_DATE) return new Date(MIN_DATE);
       if(s > MAX_DATE) return new Date(MAX_DATE);
       return s;
     }
-
     function setStartMonthFromDate(d){
       const el = document.getElementById('startMonth');
       const s = clampMonth(d);
@@ -133,7 +129,7 @@
     function initSelectors(){
       const elYear=document.getElementById('yearSelect');
       const curY = MIN_DATE.getFullYear();
-      const maxY = MAX_DATE.getFullYear(); // ✅ 只到未來一年
+      const maxY = MAX_DATE.getFullYear();
       elYear.innerHTML='';
       for(let y=curY; y<=maxY; y++){
         const opt=document.createElement('option');
@@ -141,77 +137,115 @@
         if(y===curY) opt.selected=true;
         elYear.appendChild(opt);
       }
-
-      // month input：卡住範圍（無法選之前月份，也無法超過一年）
       const elMonth = document.getElementById('startMonth');
       elMonth.min = `${MIN_DATE.getFullYear()}-${String(MIN_DATE.getMonth()+1).padStart(2,'0')}`;
       elMonth.max = `${MAX_DATE.getFullYear()}-${String(MAX_DATE.getMonth()+1).padStart(2,'0')}`;
-
       setStartMonthFromDate(NOW);
       document.getElementById('apiBase').textContent = API_BASE;
     }
 
     function getState(year,ds){return(CACHE[year]&&CACHE[year][ds]==='full')?'full':'available';}
 
-    // 強制 GET 最新（破快取）
     async function fetchYear(year){
+      if (pendingGetAbort) pendingGetAbort.abort();
+      const ctl = new AbortController();
+      pendingGetAbort = ctl;
+
       const u=new URL(API_BASE);u.searchParams.set('year',String(year));u.searchParams.set('t',Date.now());
-      const res=await fetch(u.toString(),{headers:{'Accept':'application/json'},cache:'no-store'});
-      if(!res.ok)throw new Error('API GET failed '+res.status);
-      const data=await res.json();CACHE[year]=data.status||{};
+      const res=await fetch(u.toString(),{headers:{'Accept':'application/json'},cache:'no-store',signal:ctl.signal});
+      if(!res.ok) throw new Error('API GET failed '+res.status);
+      const data=await res.json();
+      CACHE[year]=data.status||{};
       document.getElementById('lastSync').textContent='讀取於 '+new Date().toLocaleString();
+      pendingGetAbort = null;
       return CACHE[year];
     }
 
+    // ==== 事件委派：只掛一次（點「可售」徽章才撥號）====
+    document.getElementById('calendars').addEventListener('click', (ev) => {
+      const el = ev.target.closest('.state.available.clickable');
+      if (!el) return;
+      window.location.href = `tel:${PHONE}`;
+    });
+
     function renderCalendars(){
-      const holder=document.getElementById('calendars');holder.innerHTML='';
-      // 以起始月份起，最多顯示 3 個月，但不超過 MAX_DATE
+      const holder=document.getElementById('calendars');
       let base = getStartMonthDate();
       const months = [];
       for(let k=0;k<3;k++){
         const d = addMonths(base, k);
-        if(d > MAX_DATE) break;          // 超過一年就不再顯示
+        if(d > MAX_DATE) break;
         months.push({y:d.getFullYear(), m:d.getMonth()+1});
       }
 
-      months.forEach(({y,m})=>{
-        const cal=document.createElement('div');cal.className='calendar';
-        const head=document.createElement('div');head.className='cal-head';head.innerHTML=`<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;cal.appendChild(head);
-        const table=document.createElement('table');const thead=document.createElement('thead');
-        thead.innerHTML=`<tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr>`;table.appendChild(thead);
-        const tbody=document.createElement('tbody');const firstWd=new Date(y,m-1,1).getDay();const lastDay=new Date(y,m,0).getDate();
-        let row=document.createElement('tr');for(let i=0;i<firstWd;i++)row.appendChild(document.createElement('td'));
-        let fullCount=0,freeCount=0;
-        for(let d=1;d<=lastDay;d++){
-          const td=document.createElement('td');const dstr=ymd(y,m,d);const isPast=dstr<todayStr;const isToday=dstr===todayStr;
-          td.className='day'+(isWeekend(y,m,d)?' weekend':'')+(isToday?' is-today':'')+(isPast?' past muted':'');
-          let inner=`<span class="dateNo">${d}</span>`;if(isToday)inner+=`<span class="today-dot"></span>`;
-          if(!isPast){
-            const state=getState(y,dstr);
-            const cls=state==='full'?'full':'available';
-            const label=state==='full'?'已滿':'可售';
-            const clickable = (state==='available');
-            inner+=`<span class="state ${cls} ${clickable?'clickable':''}" ${clickable?`role="button" aria-label="撥打 ${PHONE}" data-tel="1"`:''}>${label}</span>`;
-            if(state==='full') fullCount++; else freeCount++;
-          }
-          td.innerHTML=inner;
+      // 以字串拼接，最後一次性注入（效能佳）
+      let html = '';
+      for (const {y,m} of months) {
+        const firstWd = new Date(y,m-1,1).getDay();
+        const lastDay = new Date(y,m,0).getDate();
+        let rowsHtml = '<tr>'+ '<td></td>'.repeat(firstWd);
 
-          if(!isPast){
-            td.addEventListener('click',(ev)=>{
-              const tag=ev.target;
-              if(tag && tag.matches('.state.available.clickable')){
-                window.location.href=`tel:${PHONE}`;
-              }
-            });
+        let fullCount=0, freeCount=0;
+        for (let d=1; d<=lastDay; d++) {
+          const dstr = ymd(y,m,d);
+          const isPast = dstr < todayStr;
+          const isToday = dstr === todayStr;
+          const weekend = isWeekend(y,m,d) ? ' weekend' : '';
+          const todayCls = isToday ? ' is-today' : '';
+          const pastCls = isPast ? ' past muted' : '';
+          let cell = `<td class="day${weekend}${todayCls}${pastCls}" data-y="${y}" data-m="${m}" data-d="${d}">`;
+          cell += `<span class="dateNo">${d}</span>`;
+          if (isToday) cell += `<span class="today-dot"></span>`;
+          if (!isPast) {
+            const st = getState(y, dstr);
+            const cls = st==='full' ? 'full' : 'available';
+            const label = st==='full' ? '已滿' : '可售';
+            const clickable = st==='available' ? ' clickable' : '';
+            cell += `<span class="state ${cls}${clickable}">${label}</span>`;
+            if (st==='full') fullCount++; else freeCount++;
           }
+          cell += `</td>`;
+          rowsHtml += cell;
 
-          row.appendChild(td);
-          if((firstWd + d) % 7 === 0){tbody.appendChild(row);row=document.createElement('tr');}
+          if ((firstWd + d) % 7 === 0 && d !== lastDay) {
+            rowsHtml += '</tr><tr>';
+          }
         }
-        if(row.children.length)tbody.appendChild(row);
-        table.appendChild(tbody);cal.appendChild(table);holder.appendChild(cal);
-        const el=document.getElementById(`cnt-${y}-${m}`);if(el)el.textContent=`可售 ${String(freeCount).padStart(2,'0')} • 已滿 ${String(fullCount).padStart(2,'0')}`;
-      });
+        rowsHtml += '</tr>';
+
+        html += `
+          <div class="calendar">
+            <div class="cal-head">
+              <div class="cal-title">${y} 年 ${m} 月</div>
+              <div class="counts" id="cnt-${y}-${m}">可售 ${String(freeCount).padStart(2,'0')} • 已滿 ${String(fullCount).padStart(2,'0')}</div>
+            </div>
+            <table>
+              <thead><tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr></thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>`;
+      }
+      holder.innerHTML = html;
+    }
+
+    function hashVisibleView(){
+      const base = getStartMonthDate();
+      const months = [];
+      for(let k=0;k<3;k++){
+        const d = addMonths(base, k);
+        if(d > MAX_DATE) break;
+        months.push(d);
+      }
+      const pick = {};
+      for (const d of months) {
+        const y=d.getFullYear(), m=d.getMonth()+1;
+        const last = new Date(y,m,0).getDate();
+        for (let day=1; day<=last; day++) {
+          const ds = ymd(y,m,day);
+          pick[ds] = (CACHE[y] && CACHE[y][ds]) || 'free';
+        }
+      }
+      return JSON.stringify(pick);
     }
 
     async function reloadNow(){
@@ -220,17 +254,24 @@
       try{
         if(btn){btn.disabled=true;btn.textContent='重新整理中…';}
         if(last){last.textContent='重新整理中…';}
-        // 依當前三個月需求抓取對應年份（卡 1 年範圍）
-        let base = getStartMonthDate();
-        const years=new Set();
-        for(let k=0;k<3;k++){
-          const d=addMonths(base,k);
-          if(d>MAX_DATE) break;
+
+        // 只抓「畫面會用到的年份」
+        const base = getStartMonthDate();
+        const years = new Set();
+        for (let k=0;k<3;k++){
+          const d = addMonths(base, k);
+          if (d > MAX_DATE) break;
           years.add(d.getFullYear());
         }
-        for(const y of years){ await fetchYear(y); }
-        renderCalendars();
-        if(last){last.textContent='讀取於 '+new Date().toLocaleString();}  <!-- ← 修正：移除多餘 ) -->
+        for (const y of years){ await fetchYear(y); }
+
+        // 資料若未變，不重繪
+        const newHash = hashVisibleView();
+        if (newHash !== lastViewHash) {
+          lastViewHash = newHash;
+          renderCalendars();
+        }
+        if(last){last.textContent='讀取於 '+new Date().toLocaleString();}
       }catch(e){
         console.error(e);
         alert('重新整理失敗：'+(e?.message||e));
@@ -240,26 +281,19 @@
       }
     }
 
-    function shiftMonths(n){
-      let base = addMonths(getStartMonthDate(), n);
-      setStartMonthFromDate(base);  // 會自動 clamp 到 [MIN, MAX]
-      reloadNow();
-    }
+    function shiftMonths(n){ setStartMonthFromDate(addMonths(getStartMonthDate(), n)); reloadNow(); }
     function goToday(){ setStartMonthFromDate(NOW); reloadNow(); }
 
-    // 手動事件
     document.getElementById('btnReload').onclick=reloadNow;
     document.getElementById('btnPrev3').onclick=()=>shiftMonths(-3);
     document.getElementById('btnNext3').onclick=()=>shiftMonths(3);
     document.getElementById('btnToday').onclick=goToday;
     document.getElementById('yearSelect').addEventListener('change', reloadNow);
     document.getElementById('startMonth').addEventListener('change', ()=>{
-      // 使用者手改（如鍵盤輸入），也強制 clamp
-      setStartMonthFromDate(getStartMonthDate());
+      setStartMonthFromDate(getStartMonthDate()); // clamp
       reloadNow();
     });
 
-    // 自動每 30 秒刷新（避免重入）
     let refreshing=false;
     setInterval(async ()=>{
       if(refreshing) return;
@@ -268,7 +302,6 @@
       refreshing=false;
     }, AUTO_REFRESH_MS);
 
-    // 初始化
     (async function init(){
       initSelectors();
       await reloadNow();
