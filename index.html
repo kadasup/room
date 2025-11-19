@@ -91,7 +91,7 @@
   (function(){
     const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
     const PHONE = '0905385388';
-    const AUTO_REFRESH_MS = 30000;
+    const AUTO_REFRESH_MS = 220000;
 
     // 範圍：從本月開始僅顯示未來一年
     const NOW = new Date();
@@ -249,21 +249,30 @@
     }
 
     async function reloadNow(){
-      const btn=document.getElementById('btnReload');
-      const last=document.getElementById('lastSync');
+      const btn = document.getElementById('btnReload');
+      const last = document.getElementById('lastSync');
       try{
-        if(btn){btn.disabled=true;btn.textContent='重新整理中…';}
-        if(last){last.textContent='重新整理中…';}
+        if(btn){ btn.disabled = true; btn.textContent = '重新整理中…'; }
+        if(last){ last.textContent = '重新整理中…'; }
 
-        // 只抓「畫面會用到的年份」
+        // 只抓「畫面會用到、且還沒在快取裡的年份」
         const base = getStartMonthDate();
         const years = new Set();
-        for (let k=0;k<3;k++){
+        for (let k = 0; k < 3; k++) {
           const d = addMonths(base, k);
           if (d > MAX_DATE) break;
           years.add(d.getFullYear());
         }
-        for (const y of years){ await fetchYear(y); }
+
+        const tasks = [];
+        for (const y of years) {
+          if (!CACHE[y]) {            // 已在快取就不再打 API
+            tasks.push(fetchYear(y));
+          }
+        }
+        if (tasks.length) {
+          await Promise.all(tasks);   // 多個年份同時抓
+        }
 
         // 資料若未變，不重繪
         const newHash = hashVisibleView();
@@ -271,13 +280,13 @@
           lastViewHash = newHash;
           renderCalendars();
         }
-        if(last){last.textContent='讀取於 '+new Date().toLocaleString();}
+        if(last){ last.textContent = '讀取於 ' + new Date().toLocaleString(); }
       }catch(e){
         console.error(e);
-        alert('重新整理失敗：'+(e?.message||e));
-        if(last){last.textContent='讀取失敗';}
+        alert('重新整理失敗：' + (e?.message || e));
+        if(last){ last.textContent = '讀取失敗'; }
       }finally{
-        if(btn){btn.disabled=false;btn.textContent='重新整理';}
+        if(btn){ btn.disabled = false; btn.textContent = '重新整理'; }
       }
     }
 
