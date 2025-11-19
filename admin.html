@@ -194,15 +194,29 @@
       return Array.from({length:last}, (_,i)=>i+1);
     }
 
-    async function ensureYearsLoadedForView(){
-      const [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
+     async function ensureYearsLoadedForView(){
+      const [Y, M] = elMonth.value.split('-').map(v => parseInt(v, 10));
+
+      // 算出畫面會用到的年份（最多跨 2 年）
       const years = new Set();
-      for(let k=0;k<3;k++){
-        let y=Y, m=M+k;
-        if(m>12){ y += Math.floor((m-1)/12); }
+      for (let k = 0; k < 3; k++) {
+        let y = Y, m = M + k;
+        if (m > 12) {
+          y += Math.floor((m - 1) / 12);
+        }
         years.add(y);
       }
-      for(const y of years){ await apiGet(y); }
+
+      // 只對「尚未在 CACHE 裡」的年份打 API，並且同時抓
+      const tasks = [];
+      for (const y of years) {
+        if (!CACHE[y]) {          // ★ 這年已經抓過就不用再打 API
+          tasks.push(apiGet(y));
+        }
+      }
+      if (tasks.length) {
+        await Promise.all(tasks); // ★ 多個年份一起抓，比一個一個等快
+      }
     }
 
     async function loadYearAndRender(){
