@@ -120,7 +120,7 @@
       </label>
       <button id="btnPrev3" class="secondary">← 前 3 個月</button>
       <button id="btnNext3" class="secondary">後 3 個月 →</button>
-      <button id="btnReload" class="secondary">重新載入</button>
+      <button id="btnReload" class="secondary">今天</button>
       <span style="justify-self:end" id="lastSync" class="chip">未同步</span>
     </div>
 
@@ -326,8 +326,8 @@
       const last = document.getElementById('lastSync');
       try{
         btn.disabled = true;
-        btn.textContent = '重新載入中…';
-        if(last) last.textContent = '重新載入中…';
+        btn.textContent = '讀取中…';
+        if(last) last.textContent = '讀取中…';
         await loadYearAndRender();
         if(last) last.textContent = '讀取於 ' + new Date().toLocaleString();
       }catch(err){
@@ -336,8 +336,25 @@
         if(last) last.textContent = '讀取失敗';
       }finally{
         btn.disabled = false;
-        btn.textContent = '重新載入';
+        btn.textContent = '今天';
       }
+    }
+
+    // 「今天」按鈕：跳回今天所在的月份與年份，再重新載入
+    function goToday(){
+      const now = new Date();
+      let Y = now.getFullYear();
+      let M = now.getMonth() + 1;
+
+      const [minY, minM] = elMonth.min.split('-').map(v => parseInt(v, 10));
+      if (Y < minY || (Y === minY && M < minM)) {
+        Y = minY;
+        M = minM;
+      }
+
+      elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
+      elYear.value = String(Y);
+      reloadNow();
     }
 
     function shiftMonths(n){
@@ -350,11 +367,12 @@
 
       if (base < minDate) base = minDate;
       elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
+      elYear.value = String(base.getFullYear());
       reloadNow();
     }
 
     // 事件
-    document.getElementById('btnReload').addEventListener('click', reloadNow);
+    document.getElementById('btnReload').addEventListener('click', goToday);
     document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3));
     document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));
 
