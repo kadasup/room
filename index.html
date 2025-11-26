@@ -121,16 +121,17 @@
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿．空房表1126（僅供查詢）</h2>
+    <h2>一斗夢包棟民宿．空房表（僅供查詢）</h2>
     <p class="notice">
       房況僅供參考，如需訂房請撥打電話：
       <a href="tel:0905385388">0905385388</a>
+      （點電話開啟撥號0905385388）
       或官方加入 Line
       <a href="https://line.me/R/ti/p/@518bytys" target="_blank" rel="noopener">@518bytys</a>
     </p>
 
     <div class="controls">
-      <label>點選日期
+      <label>起始月份
         <input id="startMonth" type="month">
       </label>
       <button id="btnPrev3" class="secondary">← 前 3 個月</button>
@@ -149,7 +150,10 @@
 
     <div id="calendars" class="grid" aria-label="三個月月曆"></div>
 
+    <div class="footer">
+      <div>資料來源 API：<span id="apiBase" class="link"></span></div>
     </div>
+  </div>
 
   <script>
     // ====== 常數（請確認與後台使用同一個 /exec）======
