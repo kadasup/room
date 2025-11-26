@@ -226,8 +226,17 @@
     function initSelectors(){
       const now = new Date();
       const curYear = now.getFullYear();
+
+      // 最小：本月
       const minMonth = `${curYear}-${String(now.getMonth()+1).padStart(2,'0')}`;
       elMonth.min = minMonth;
+
+      // 最大：往後「近兩年」（本月起算 24 個月內）
+      const maxDate = new Date(now.getFullYear(), now.getMonth()+23, 1); // 0-based 月份
+      const maxMonth = `${maxDate.getFullYear()}-${String(maxDate.getMonth()+1).padStart(2,'0')}`;
+      elMonth.max = maxMonth;
+
+      // 預設顯示本月
       elMonth.value = minMonth;
     }
 
@@ -267,11 +276,15 @@
 
     function renderCalendars(){
       let [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
-      const minY = parseInt(elMonth.min.split('-')[0],10);
-      const minM = parseInt(elMonth.min.split('-')[1],10);
+      const [minY, minM] = elMonth.min.split('-').map(v=>parseInt(v,10));
+      const [maxY, maxM] = elMonth.max.split('-').map(v=>parseInt(v,10));
 
+      // 不可早於 min，也不可晚於 max
       if (Y < minY || (Y===minY && M<minM)) {
         Y = minY; M = minM;
+        elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
+      } else if (Y > maxY || (Y===maxY && M>maxM)) {
+        Y = maxY; M = maxM;
         elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
       }
 
@@ -395,16 +408,19 @@
       }
     }
 
-    // 「今天」按鈕：跳回今天所在月份再讀取
+    // 「今天」按鈕：跳回今天所在月份（但不超過 min/max）再讀取
     function goToday(){
       const now = new Date();
       let Y = now.getFullYear();
       let M = now.getMonth() + 1;
 
       const [minY, minM] = elMonth.min.split('-').map(v => parseInt(v, 10));
+      const [maxY, maxM] = elMonth.max.split('-').map(v => parseInt(v, 10));
+
       if (Y < minY || (Y === minY && M < minM)) {
-        Y = minY;
-        M = minM;
+        Y = minY; M = minM;
+      } else if (Y > maxY || (Y === maxY && M > maxM)) {
+        Y = maxY; M = maxM;
       }
 
       elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
@@ -412,14 +428,19 @@
     }
 
     function shiftMonths(n){
-      const min = elMonth.min.split('-').map(v=>parseInt(v,10));
-      const minDate = new Date(min[0], min[1]-1, 1);
+      const [minY, minM] = elMonth.min.split('-').map(v=>parseInt(v,10));
+      const [maxY, maxM] = elMonth.max.split('-').map(v=>parseInt(v,10));
+
+      const minDate = new Date(minY, minM-1, 1);
+      const maxDate = new Date(maxY, maxM-1, 1);
 
       const cur = elMonth.value.split('-').map(v=>parseInt(v,10));
       let base = new Date(cur[0], cur[1]-1, 1);
       base.setMonth(base.getMonth() + n);
 
       if (base < minDate) base = minDate;
+      if (base > maxDate) base = maxDate;
+
       elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
       reloadNow();
     }
