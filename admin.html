@@ -7,35 +7,76 @@
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;   /* 週末底色對齊網站 */
-      --today:#fff8d6;                                /* 今日淡黃底（保留你的設定） */
+      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
+      --today:#fff8d6;
       --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
     h2{margin:6px 0 12px;text-align:center}
     .wrap{max-width:1100px;margin:0 auto}
-    .controls{display:grid;grid-template-columns:repeat(8,auto);gap:8px;align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .controls{
+      display:grid;
+      grid-template-columns:repeat(7,auto);
+      gap:8px;
+      align-items:center;
+      background:#fff;
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      margin-bottom:12px;
+      box-shadow:0 1px 2px rgba(0,0,0,.04)
+    }
     label{display:flex;gap:8px;align-items:center;color:var(--muted)}
-    input[type="month"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
-    button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
+    input[type="month"],select{
+      padding:6px 10px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:#fff;
+      color:#000
+    }
+    button{
+      padding:10px 14px;
+      background:var(--brand);
+      border:none;
+      color:#fff;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600
+    }
     button:hover{background:var(--brand-600)}
     .secondary{background:#e9eefb;color:#0f2d62}
     .legend{display:flex;gap:12px;align-items:center;font-size:14px;color:#444;margin:6px 0 14px}
     .dot{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:6px}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--sticky);position:sticky;top:0;z-index:1}
+    .cal-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      background:var(--sticky);
+      position:sticky;
+      top:0;
+      z-index:1
+    }
     .cal-title{font-weight:700}
 
     table{width:100%;border-collapse:separate;border-spacing:0}
     th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
-    thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
+    thead th{
+      font-size:12px;
+      color:#666;
+      background:#fafafa;
+      position:sticky;
+      top:48px;
+      z-index:1
+    }
 
-    /* ↘ 尺寸對齊你提供的網站 */
     .day{
       border-left:1px solid var(--border);
-      min-height:52px;            /* 對齊：小巧格高 */
+      min-height:52px;
       vertical-align:top;
       position:relative;
       background:#fff;
@@ -44,7 +85,6 @@
     .day:first-child{border-left:none}
     .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555;z-index:2}
 
-    /* 小型膠囊徽章（與網站一致：6×8 padding、字重 600、距離日期約 22px） */
     .state{
       margin-top:22px;
       display:inline-block;
@@ -57,19 +97,25 @@
     .full{background:var(--bad)}
     .free{background:var(--ok)}
 
-    /* 今日樣式（保留你需求的淡黃＋紅點） */
     .is-today{background:var(--today)}
-    .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
+    .today-dot{
+      position:absolute;
+      right:6px;
+      top:6px;
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:#e53935;
+      box-shadow:0 0 0 2px #fff
+    }
 
-    /* 週末底色 */
     .weekend{background:var(--pink)}
     .muted{color:#aaa}
 
-    /* 今日之前：不可點、不顯示狀態，但用 :after 佔位讓列高一致 */
     .past{opacity:.6; pointer-events:none}
     .past .state{display:none}
     .past::after{
-      content:"佔位";             /* 文字隱形，只做高度佔位 */
+      content:"佔位";
       visibility:hidden;
       display:inline-block;
       margin-top:22px;
@@ -83,9 +129,20 @@
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
     .notice{color:#d32f2f;font-weight:600}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff}
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff
+    }
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
-    @media (max-width: 960px){ .grid{grid-template-columns:1fr} .controls{grid-template-columns:1fr 1fr;row-gap:10px}}
+    @media (max-width: 960px){
+      .grid{grid-template-columns:1fr}
+      .controls{grid-template-columns:1fr 1fr;row-gap:10px}
+    }
   </style>
 </head>
 <body>
@@ -93,15 +150,12 @@
     <h2>房況後台（API 版）</h2>
 
     <div class="controls">
-      <label>年份
-        <select id="yearSel"></select>
-      </label>
       <label>起始月份
         <input id="startMonth" type="month">
       </label>
       <button id="btnPrev3" class="secondary">← 前 3 個月</button>
       <button id="btnNext3" class="secondary">後 3 個月 →</button>
-      <button id="btnReload" class="secondary">重新載入</button>
+      <button id="btnReload" class="secondary">今天</button>
       <button id="btnSetSatFull" class="secondary">本月週六→已滿</button>
       <button id="btnSetAllFree" class="secondary">本月全部→可售</button>
       <span style="justify-self:end" id="lastSync" class="chip">未同步</span>
@@ -166,24 +220,12 @@
     }
 
     // ===== 介面 =====
-    const elYear = document.getElementById('yearSel');
     const elMonth = document.getElementById('startMonth');
     const elCals = document.getElementById('calendars');
 
     function initSelectors(){
       const now = new Date();
       const curYear = now.getFullYear();
-      const y1 = curYear + 2;
-
-      elYear.innerHTML = '';
-      for(let y=curYear; y<=y1; y++){
-        const opt = document.createElement('option');
-        opt.value = String(y);
-        opt.textContent = y;
-        if(y===curYear) opt.selected = true;
-        elYear.appendChild(opt);
-      }
-
       const minMonth = `${curYear}-${String(now.getMonth()+1).padStart(2,'0')}`;
       elMonth.min = minMonth;
       elMonth.value = minMonth;
@@ -194,10 +236,10 @@
       return Array.from({length:last}, (_,i)=>i+1);
     }
 
-     async function ensureYearsLoadedForView(){
+    // 只抓畫面會用到、且尚未在 CACHE 裡的年份
+    async function ensureYearsLoadedForView(){
       const [Y, M] = elMonth.value.split('-').map(v => parseInt(v, 10));
 
-      // 算出畫面會用到的年份（最多跨 2 年）
       const years = new Set();
       for (let k = 0; k < 3; k++) {
         let y = Y, m = M + k;
@@ -207,15 +249,14 @@
         years.add(y);
       }
 
-      // 只對「尚未在 CACHE 裡」的年份打 API，並且同時抓
       const tasks = [];
       for (const y of years) {
-        if (!CACHE[y]) {          // ★ 這年已經抓過就不用再打 API
+        if (!CACHE[y]) {
           tasks.push(apiGet(y));
         }
       }
       if (tasks.length) {
-        await Promise.all(tasks); // ★ 多個年份一起抓，比一個一個等快
+        await Promise.all(tasks);
       }
     }
 
@@ -258,12 +299,10 @@
         table.appendChild(thead);
 
         const tbody = document.createElement('tbody');
-        const firstWd = new Date(y,m-1,1).getDay(); // 0=Sun..6=Sat
+        const firstWd = new Date(y,m-1,1).getDay();
         const days = monthDays(y,m);
         let row = document.createElement('tr');
         for(let i=0;i<firstWd;i++) row.appendChild(document.createElement('td'));
-
-        let fullCount=0, freeCount=0;
 
         days.forEach(day=>{
           const td = document.createElement('td');
@@ -276,11 +315,11 @@
             + (isToday?' is-today':'')
             + (isPast?' past muted':'');
 
-          let inner = `<span class=\"dateNo\">${day}</span>`;
-          if (isToday) inner += `<span class=\"today-dot\"></span>`;
+          let inner = `<span class="dateNo">${day}</span>`;
+          if (isToday) inner += `<span class="today-dot"></span>`;
           if (!isPast) {
             const state = (CACHE[y]?.[dstr] || 'free');
-            inner += `<span class=\"state ${state==='full'?'full':'free'}\">${state==='full'?'已滿':'可售'}</span>`;
+            inner += `<span class="state ${state==='full'?'full':'free'}">${state==='full'?'已滿':'可售'}</span>`;
           }
           td.innerHTML = inner;
 
@@ -328,7 +367,7 @@
       let full=0, free=0;
       days.forEach(d=>{
         const dstr = ymd(y,m,d);
-        if(dstr < todayStr) return; // 今日之前不計入
+        if(dstr < todayStr) return;
         const st = (CACHE[y]?.[dstr] || 'free');
         if(st==='full') full++; else free++;
       });
@@ -336,14 +375,14 @@
       if(el) el.textContent = `可售 ${String(free).padStart(2,'0')} • 已滿 ${String(full).padStart(2,'0')}`;
     }
 
-    // 重新載入：顯示進度、錯誤、避免連點
+    // 重新載入：讀取目前起始月份的 3 個月
     async function reloadNow(){
       const btn = document.getElementById('btnReload');
       const last = document.getElementById('lastSync');
       try{
         btn.disabled = true;
-        btn.textContent = '重新載入中…';
-        if(last) last.textContent = '重新載入中…';
+        btn.textContent = '讀取中…';
+        if(last) last.textContent = '讀取中…';
         await loadYearAndRender();
         if(last) last.textContent = '讀取於 ' + new Date().toLocaleString();
       }catch(err){
@@ -352,8 +391,24 @@
         if(last) last.textContent = '讀取失敗';
       }finally{
         btn.disabled = false;
-        btn.textContent = '重新載入';
+        btn.textContent = '今天';
       }
+    }
+
+    // 「今天」按鈕：跳回今天所在月份再讀取
+    function goToday(){
+      const now = new Date();
+      let Y = now.getFullYear();
+      let M = now.getMonth() + 1;
+
+      const [minY, minM] = elMonth.min.split('-').map(v => parseInt(v, 10));
+      if (Y < minY || (Y === minY && M < minM)) {
+        Y = minY;
+        M = minM;
+      }
+
+      elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
+      reloadNow();
     }
 
     function shiftMonths(n){
@@ -370,7 +425,7 @@
     }
 
     // 事件
-    document.getElementById('btnReload').addEventListener('click', reloadNow);
+    document.getElementById('btnReload').addEventListener('click', goToday);
     document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3));
     document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));
 
@@ -409,7 +464,6 @@
       document.getElementById('apiBase').textContent = API_BASE;
       document.getElementById('apiBase').addEventListener('click', ()=>window.open(API_BASE,'_blank'));
       await loadYearAndRender();
-      elYear.addEventListener('change', reloadNow);
       elMonth.addEventListener('change', reloadNow);
     })();
   </script>
