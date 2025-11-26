@@ -15,7 +15,18 @@
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;margin:24px;background:var(--bg);color:var(--fg)}
     h2{margin:6px 0 8px;text-align:center}
     .wrap{max-width:1100px;margin:0 auto}
-    .controls{display:grid;grid-template-columns:repeat(6,auto);gap:8px;align-items:center;background:#fff;padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .controls{
+      display:grid;
+      grid-template-columns:repeat(6,auto);
+      gap:8px;
+      align-items:center;
+      background:#fff;
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      margin-bottom:12px;
+      box-shadow:0 1px 2px rgba(0,0,0,.04)
+    }
     label{display:flex;gap:8px;align-items:center;color:var(--muted)}
     input[type="month"],select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#000}
     button{padding:10px 14px;background:var(--brand);border:none;color:#fff;border-radius:10px;cursor:pointer;font-weight:600}
@@ -32,10 +43,10 @@
     th,td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:center}
     thead th{font-size:12px;color:#666;background:#fafafa;position:sticky;top:48px;z-index:1}
 
-    /* ↘ 尺寸對齊你提供的網站 */
+    /* 日期格 */
     .day{
       border-left:1px solid var(--border);
-      min-height:52px;            /* 對齊：小巧格高 */
+      min-height:52px;
       vertical-align:top;
       position:relative;
       background:#fff;
@@ -44,7 +55,7 @@
     .day:first-child{border-left:none}
     .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555;z-index:2}
 
-    /* 小型膠囊徽章（與網站一致：6×8 padding、字重 600、距離日期約 22px） */
+    /* 膠囊徽章 */
     .state{
       margin-top:22px;
       display:inline-block;
@@ -57,28 +68,36 @@
     .full{background:var(--bad)}
     .free{background:var(--ok)}
 
-    /* 讓「可售」的電話連結看起來像一般文字徽章 */
+    /* 可售電話連結 */
     .call-link{
       text-decoration:none;
       color:inherit;
     }
     .call-link .state{
-      cursor:pointer;   /* 只有徽章本身是可點擊手勢 */
+      cursor:pointer;   /* 只有徽章是手指游標 */
     }
 
-    /* 今日樣式（保留你需求的淡黃＋紅點） */
+    /* 今天樣式 */
     .is-today{background:var(--today)}
-    .today-dot{position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px #fff}
+    .today-dot{
+      position:absolute;
+      right:6px;
+      top:6px;
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:#e53935;
+      box-shadow:0 0 0 2px #fff
+    }
 
-    /* 週末底色 */
+    /* 週末與過去日期 */
     .weekend{background:var(--pink)}
     .muted{color:#aaa}
 
-    /* 今日之前：不可點、不顯示狀態，但用 :after 佔位讓列高一致 */
     .past{opacity:.6; pointer-events:none}
     .past .state{display:none}
     .past::after{
-      content:"佔位";             /* 文字隱形，只做高度佔位 */
+      content:"佔位";
       visibility:hidden;
       display:inline-block;
       margin-top:22px;
@@ -91,7 +110,7 @@
 
     .footer{margin-top:12px;color:#666;font-size:13px}
     .counts{font-variant-numeric:tabular-nums}
-    .notice{color:#d32f2f;font-weight:600;text-align:center;margin-bottom:24px} /* 空兩行的感覺 */
+    .notice{color:#d32f2f;font-weight:600;text-align:center;margin-bottom:24px}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff}
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
     @media (max-width: 960px){
@@ -147,7 +166,6 @@
     const fmt = (d)=>d.toISOString().slice(0,10);
     const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const todayStr = fmt(new Date());
-    const addMonths = (d, n)=> new Date(d.getFullYear(), d.getMonth()+n, 1);
     const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
 
     // ===== API GET（防快取）=====
@@ -171,8 +189,17 @@
     function initSelectors(){
       const now = new Date();
       const curYear = now.getFullYear();
+
+      // 最小：本月
       const minMonth = `${curYear}-${String(now.getMonth()+1).padStart(2,'0')}`;
       elMonth.min = minMonth;
+
+      // 最大：往後近兩年（本月起 24 個月內）
+      const maxDate = new Date(now.getFullYear(), now.getMonth()+23, 1); // 0-based 月份
+      const maxMonth = `${maxDate.getFullYear()}-${String(maxDate.getMonth()+1).padStart(2,'0')}`;
+      elMonth.max = maxMonth;
+
+      // 預設顯示本月
       elMonth.value = minMonth;
     }
 
@@ -185,7 +212,6 @@
     async function ensureYearsLoadedForView(){
       const [Y, M] = elMonth.value.split('-').map(v => parseInt(v, 10));
 
-      // 算出畫面會用到的年份（最多跨 2 年）
       const years = new Set();
       for (let k = 0; k < 3; k++) {
         let y = Y, m = M + k;
@@ -195,7 +221,6 @@
         years.add(y);
       }
 
-      // 只對「尚未在 CACHE 裡」的年份打 API，並且同時抓
       const tasks = [];
       for (const y of years) {
         if (!CACHE[y]) {
@@ -214,11 +239,15 @@
 
     function renderCalendars(){
       let [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
-      const minY = parseInt(elMonth.min.split('-')[0],10);
-      const minM = parseInt(elMonth.min.split('-')[1],10);
+      const [minY, minM] = elMonth.min.split('-').map(v=>parseInt(v,10));
+      const [maxY, maxM] = elMonth.max.split('-').map(v=>parseInt(v,10));
 
+      // 不可早於 min，也不可晚於 max
       if (Y < minY || (Y===minY && M<minM)) {
         Y = minY; M = minM;
+        elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
+      } else if (Y > maxY || (Y===maxY && M>maxM)) {
+        Y = maxY; M = maxM;
         elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
       }
 
@@ -267,10 +296,8 @@
           if (!isPast) {
             const state = (CACHE[y]?.[dstr] || 'free');
             if (state === 'full') {
-              // 已滿：純文字標記
               inner += `<span class="state full">已滿</span>`;
             } else {
-              // 可售：包成 tel 連結，點擊可撥打 0905385388
               inner += `<a href="tel:0905385388" class="call-link"><span class="state free">可售</span></a>`;
             }
           }
@@ -305,7 +332,7 @@
       if(el) el.textContent = `可售 ${String(free).padStart(2,'0')} • 已滿 ${String(full).padStart(2,'0')}`;
     }
 
-    // 重新載入：顯示進度、錯誤、避免連點
+    // 抓目前起始月份的 3 個月
     async function reloadNow(){
       const btn = document.getElementById('btnReload');
       const last = document.getElementById('lastSync');
@@ -325,16 +352,19 @@
       }
     }
 
-    // 「今天」按鈕：跳回今天所在的月份，再重新載入
+    // 「今天」按鈕：跳回今天所在月份（限制在 min/max 內）
     function goToday(){
       const now = new Date();
       let Y = now.getFullYear();
       let M = now.getMonth() + 1;
 
       const [minY, minM] = elMonth.min.split('-').map(v => parseInt(v, 10));
+      const [maxY, maxM] = elMonth.max.split('-').map(v => parseInt(v, 10));
+
       if (Y < minY || (Y === minY && M < minM)) {
-        Y = minY;
-        M = minM;
+        Y = minY; M = minM;
+      } else if (Y > maxY || (Y === maxY && M > maxM)) {
+        Y = maxY; M = maxM;
       }
 
       elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
@@ -342,14 +372,19 @@
     }
 
     function shiftMonths(n){
-      const min = elMonth.min.split('-').map(v=>parseInt(v,10));
-      const minDate = new Date(min[0], min[1]-1, 1);
+      const [minY, minM] = elMonth.min.split('-').map(v=>parseInt(v,10));
+      const [maxY, maxM] = elMonth.max.split('-').map(v=>parseInt(v,10));
+
+      const minDate = new Date(minY, minM-1, 1);
+      const maxDate = new Date(maxY, maxM-1, 1);
 
       const cur = elMonth.value.split('-').map(v=>parseInt(v,10));
       let base = new Date(cur[0], cur[1]-1, 1);
       base.setMonth(base.getMonth() + n);
 
       if (base < minDate) base = minDate;
+      if (base > maxDate) base = maxDate;
+
       elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
       reloadNow();
     }
