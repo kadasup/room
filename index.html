@@ -7,8 +7,8 @@
   <style>
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;   /* 週末底色對齊網站 */
-      --today:#fff8d6;                                /* 今日淡黃底（保留你的設定） */
+      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
+      --today:#fff8d6;
       --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
@@ -50,7 +50,7 @@
       vertical-align:top;
       position:relative;
       background:#fff;
-      cursor:default;             /* 前台唯讀，整格不是編輯手勢 */
+      cursor:default;
     }
     .day:first-child{border-left:none}
     .dateNo{position:absolute;left:6px;top:6px;font-size:12px;color:#555;z-index:2}
@@ -67,6 +67,9 @@
     }
     .full{background:var(--bad)}
     .free{background:var(--ok)}
+    
+    /* 新增：載入中樣式 */
+    .loading{background:#f0f0f0; color:#999; border:1px dashed #ccc; font-size: 12px;}
 
     /* 可售電話連結 */
     .call-link{
@@ -74,7 +77,7 @@
       color:inherit;
     }
     .call-link .state{
-      cursor:pointer;   /* 只有徽章是手指游標 */
+      cursor:pointer;
     }
 
     /* 今天樣式 */
@@ -231,8 +234,15 @@
       }
     }
 
+    // ★ 修改點：先畫介面（顯示讀取中）→ 抓資料 → 再畫一次（顯示結果）
     async function loadYearAndRender(){
+      // 1. 先畫骨架 (因為這時可能還沒有 CACHE[y]，會顯示「讀取中」)
+      renderCalendars();
+      
+      // 2. 去抓資料 (使用者這時已經看得到月曆，只是狀態是讀取中)
       await ensureYearsLoadedForView();
+      
+      // 3. 資料回來了，重畫一次 (把讀取中變成真實狀態)
       renderCalendars();
     }
 
@@ -292,12 +302,22 @@
 
           let inner = `<span class="dateNo">${day}</span>`;
           if (isToday) inner += `<span class="today-dot"></span>`;
+          
           if (!isPast) {
-            const state = (CACHE[y]?.[dstr] || 'free');
-            if (state === 'full') {
-              inner += `<span class="state full">已滿</span>`;
+            // ★ 修改點：檢查該年度資料是否已載入
+            const yearData = CACHE[y];
+
+            if (!yearData) {
+              // 資料還在路上 -> 顯示讀取中
+              inner += `<span class="state loading">讀取中</span>`;
             } else {
-              inner += `<a href="tel:0905385388" class="call-link"><span class="state free">可售</span></a>`;
+              // 資料已到 -> 顯示正確狀態
+              const state = (yearData[dstr] || 'free');
+              if (state === 'full') {
+                inner += `<span class="state full">已滿</span>`;
+              } else {
+                inner += `<a href="tel:0905385388" class="call-link"><span class="state free">可售</span></a>`;
+              }
             }
           }
           td.innerHTML = inner;
@@ -314,7 +334,14 @@
         cal.appendChild(table);
         elCals.appendChild(cal);
 
-        updateCounts(y,m);
+        // 如果資料還沒來，先不統計數量，或者顯示為 0
+        if (CACHE[y]) {
+          updateCounts(y,m);
+        } else {
+          // 資料未到時的統計顯示
+          const el = document.getElementById(`cnt-${y}-${m}`);
+          if(el) el.textContent = '資料讀取中...';
+        }
       });
     }
 
