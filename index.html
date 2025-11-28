@@ -15,7 +15,7 @@
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
       --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
-      --today:#fff8d6;
+      --today:#fff8d6; /* 今天的背景色 */
       --border:#dcdcdc; --sticky:#ffffffee;
     }
     *{box-sizing:border-box}
@@ -50,6 +50,7 @@
       padding:8px; border:1px solid var(--border); border-radius:8px; background:#fff; color:#000; font-size: 15px;
     }
 
+    /* 一般按鈕樣式 */
     button{
       padding:10px 14px;
       background:var(--brand);
@@ -62,8 +63,20 @@
       transition: background .2s;
     }
     button:active{transform: scale(0.98);}
-    button:hover{background:var(--brand-600)}
-    .secondary{background:#e9eefb;color:#0f2d62}
+    button:hover{background:var(--brand-600)} /* 這是造成手機卡色的元兇 */
+
+    /* ★ 修正重點 1：強制覆蓋次要按鈕的 Hover 狀態 */
+    /* 使用 button.secondary 提高權重，確保它永遠是淡藍色系 */
+    button.secondary{
+      background:#e9eefb;
+      color:#0f2d62;
+    }
+    button.secondary:hover, 
+    button.secondary:focus, 
+    button.secondary:active {
+      background: #dce5f6; /* 點擊時只稍微變深一點點，維持淡藍色 */
+      color: #0f2d62;
+    }
 
     .legend{
       display:flex;
@@ -144,13 +157,12 @@
     .past{opacity:1; background: #fff;}
     .past .dateNo { color: #ccc; }
 
-    /* ★ 修正：頁尾改為紅色警告色，並加粗 */
     .footer{
       margin-top:20px;
-      margin-bottom: 60px; /* 留一點空間給浮動按鈕 */
-      color: #d32f2f;      /* 紅色 */
+      margin-bottom: 60px;
+      color: #d32f2f;
       font-size: 13px;
-      font-weight: 700;    /* 加粗 */
+      font-weight: 700;
       text-align: center;
     }
     
@@ -164,7 +176,6 @@
     .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#fff; font-size: 12px;}
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
 
-    /* ★ 新增：回到頂部按鈕樣式 */
     .btn-top {
       position: fixed;
       bottom: 24px;
@@ -206,7 +217,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿 | 空房查詢表</h2>
+    <h2>一斗夢包棟民宿 | 空房表</h2>
     <p class="notice">
       如需訂房請撥打電話：
       <a href="tel:0905385388">0905385388</a><br>
@@ -227,7 +238,7 @@
     <div class="legend">
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-      <span class="chip"><span class="today-dot"></span> 今天</span>
+      <span class="chip" style="background:var(--today); border-color:#e6e6e6"><span class="today-dot"></span> 今天</span>
       <span class="chip muted" style="border:none; background:transparent">灰色為已過日期</span>
     </div>
 
@@ -464,7 +475,6 @@
     document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3));
     document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));
     
-    // ★ 新增：回到頂部按鈕邏輯
     const btnTop = document.getElementById('btnTop');
     window.addEventListener('scroll', () => {
       if (window.scrollY > 300) {
