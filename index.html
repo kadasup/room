@@ -101,7 +101,7 @@
     /* 日期格優化 */
     .day{
       border-left:1px solid var(--border);
-      height: 72px; /* ★ 強制固定高度，解決跑版問題 */
+      height: 72px; /* 強制固定高度，解決跑版問題 */
       vertical-align:top;
       position:relative;
       background:#fff;
@@ -128,7 +128,7 @@
     .free{background:var(--ok); color: #1b5e20; border-color: #a5d6a7;}
     .loading{background:#f5f5f5; color:#aaa; border:1px dashed #ddd; font-size: 11px;}
 
-    /* ★ 修正：過去的日期顯示灰色，而不是消失 */
+    /* 過去的日期顯示灰色，而不是消失 */
     .past-state {
       background: #f9f9f9; color: #ddd; border-color: #eee;
       pointer-events: none;
@@ -198,7 +198,7 @@
     <div id="calendars" class="grid" aria-label="三個月月曆"></div>
 
     <div class="footer">
-      <div>資料來源 API：<span id="apiBase" class="link"></span></div>
+      <div>房況僅供參考 | 以小管家回覆為主</div>
     </div>
   </div>
 
@@ -226,7 +226,6 @@
         return json;
       } catch (e) {
         console.error("API Error:", e);
-        // 就算失敗也要回傳空物件，避免卡住
         CACHE[year] = {}; 
         return {};
       }
@@ -329,7 +328,7 @@
           td.className = 'day'
             + (isWeekend(y,m,day)?' weekend':'')
             + (isToday?' is-today':'')
-            + (isPast?' past':''); // 移除 muted，讓 past 自己控制
+            + (isPast?' past':'');
 
           let inner = `<span class="dateNo">${day}</span>`;
           if (isToday) inner += `<span class="today-dot"></span>`;
@@ -342,7 +341,7 @@
           } else {
             // 資料已到
             if (isPast) {
-              // ★ 修正：過去日期顯示灰色的「已過」，撐開高度
+              // 過去日期顯示灰色的「已過」，撐開高度
               inner += `<span class="state past-state">已過</span>`;
             } else {
               const state = (yearData[dstr] || 'free');
@@ -437,9 +436,7 @@
 
     (async function(){
       initSelectors();
-      const apiSpan = document.getElementById('apiBase');
-      apiSpan.textContent = '連結';
-      apiSpan.addEventListener('click', ()=>window.open(API_BASE,'_blank'));
+      // 已移除顯示 API 連結的 JS，避免錯誤
       await loadYearAndRender();
       elMonth.addEventListener('change', reloadNow);
     })();
