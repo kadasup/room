@@ -17,7 +17,7 @@
       --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
       --today:#fff8d6;
       --border:#dcdcdc; --sticky:#ffffffee;
-      --holiday-text: #e53935; /* 假日文字紅 */
+      --holiday-text: #e53935;
     }
     *{box-sizing:border-box}
     
@@ -66,7 +66,6 @@
     button:active{transform: scale(0.98);}
     button:hover{background:var(--brand-600)}
 
-    /* 次要按鈕強制淡色 */
     button.secondary{ background:#e9eefb; color:#0f2d62; }
     button.secondary:hover, 
     button.secondary:focus, 
@@ -115,7 +114,6 @@
     }
     .day:first-child{border-left:none}
     
-    /* 日期數字 */
     .dateNo{position:absolute;left:4px;top:4px;font-size:11px;color:#555;z-index:2; font-family: monospace;}
     
     /* 假日樣式 */
@@ -130,15 +128,17 @@
       z-index: 2;
     }
 
+    /* ★ 修改重點：設定固定高度，確保沒字時也是一個漂亮的方塊 */
     .state{
       margin-top:28px;
-      display:block;
+      display:flex;        /* 改用 flex 讓文字(如果有的話)居中 */
+      justify-content: center;
+      align-items: center;
       margin-left: auto; margin-right: auto;
-      padding:4px 0;
+      height: 24px;        /* 固定高度，這樣拿掉文字後不會變扁 */
       border-radius:6px;
       border:1px solid var(--border);
       font-weight:600;
-      line-height:1.2;
       font-size: 13px;
       width: 90%; 
       max-width: 60px;
@@ -210,11 +210,11 @@
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿 | 空房表</h2>
+    <h2>一斗夢包棟民宿</h2>
     <p class="notice">
-      訂房：
+      如需訂房請撥打電話：
       <a href="tel:0905385388">0905385388</a><br>
-      Line ID：
+      或加 Line ID：
       <a href="https://line.me/R/ti/p/@518bytys" target="_blank" rel="noopener">@518bytys</a>
     </p>
 
@@ -248,9 +248,9 @@
     // ====== 常數 ======
     const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
     
-    // ★ 假日資料儲存處 (自動聯網更新)
+    // 假日資料儲存處
     const HOLIDAYS = {}; 
-    const FETCHED_YEARS = new Set(); // 記錄已經抓過哪一年的假日
+    const FETCHED_YEARS = new Set(); 
     // =============================================
 
     const CACHE = {}; 
@@ -260,9 +260,9 @@
     const todayStr = fmt(new Date());
     const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
 
-    // ★ 1. 抓取假日資料的函數 (來源：政府行政機關辦公日曆表開源 API)
+    // 抓取假日資料
     async function loadTaiwanHolidays(year) {
-      if (FETCHED_YEARS.has(year)) return; // 抓過就不抓
+      if (FETCHED_YEARS.has(year)) return;
       
       const url = `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`;
       try {
@@ -272,11 +272,9 @@
         
         list.forEach(item => {
           if (item.isHoliday && item.description) {
-            // 轉換日期格式 20250101 -> 2025-01-01
             const d = item.date;
             const dateStr = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
             
-            // 簡化名稱
             let name = item.description;
             if (name.includes('開國紀念日')) name = '元旦';
             else if (name.includes('和平紀念日')) name = '228';
@@ -286,8 +284,8 @@
             else if (name.includes('春節')) name = '春節';
             else if (name.includes('端午')) name = '端午';
             else if (name.includes('中秋')) name = '中秋';
-            else if (name.includes('光復')) name = '光復';
             else if (name.includes('孔子')) name = '教師';
+            else if (name.includes('光復')) name = '光復';
             else if (name.includes('行憲')) name = '行憲';
             
             HOLIDAYS[dateStr] = name;
@@ -296,7 +294,6 @@
         FETCHED_YEARS.add(year);
       } catch (e) {
         console.warn(`無法載入 ${year} 年假日:`, e);
-        // 失敗時避免重複嘗試
         FETCHED_YEARS.add(year);
       }
     }
@@ -347,7 +344,6 @@
         years.add(y);
       }
       
-      // ★ 2. 確保這些年份的假日也一併載入
       const holidayTasks = [];
       for (const y of years) {
         holidayTasks.push(loadTaiwanHolidays(y));
@@ -358,7 +354,6 @@
         if (!CACHE[y]) { apiTasks.push(apiGet(y)); }
       }
       
-      // 同時等待：假日資料 + 房況資料
       await Promise.all([...holidayTasks, ...apiTasks]);
     }
 
@@ -416,7 +411,6 @@
           const isPast = dstr < todayStr;
           const isToday = dstr === todayStr;
           
-          // ★ 3. 從自動抓取的 HOLIDAYS 物件中檢查
           const holidayName = HOLIDAYS[dstr];
 
           td.className = 'day'
@@ -439,13 +433,16 @@
             inner += `<span class="state loading">...</span>`;
           } else {
             if (isPast) {
-              inner += `<span class="state past-state">已過</span>`;
+              // ★ 修改：移除文字，只留色塊
+              inner += `<span class="state past-state"></span>`;
             } else {
               const state = (yearData[dstr] || 'free');
               if (state === 'full') {
+                // 已滿保留文字
                 inner += `<span class="state full">已滿</span>`;
               } else {
-                inner += `<a href="tel:0905385388" class="call-link"><span class="state free">可售</span></a>`;
+                // ★ 修改：可售移除文字，只留色塊
+                inner += `<a href="tel:0905385388" class="call-link"><span class="state free"></span></a>`;
               }
             }
           }
