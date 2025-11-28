@@ -89,7 +89,7 @@
     }
     .cal-title{font-weight:700; font-size: 1.1rem;}
 
-    table{width:100%;border-collapse:separate;border-spacing:0; table-layout: fixed;} /* 強制固定寬度 */
+    table{width:100%;border-collapse:separate;border-spacing:0; table-layout: fixed;}
     th,td{border-bottom:1px solid var(--border);padding:4px 2px;text-align:center}
     
     thead th{
@@ -98,10 +98,9 @@
       padding-top:10px; padding-bottom:10px;
     }
 
-    /* 日期格優化 */
     .day{
       border-left:1px solid var(--border);
-      height: 72px; /* 強制固定高度，解決跑版問題 */
+      height: 72px;
       vertical-align:top;
       position:relative;
       background:#fff;
@@ -110,10 +109,9 @@
     .day:first-child{border-left:none}
     .dateNo{position:absolute;left:4px;top:4px;font-size:11px;color:#555;z-index:2; font-family: monospace;}
 
-    /* 狀態按鈕 */
     .state{
-      margin-top:28px; /* 往下推一點，避免遮住日期 */
-      display:block;   /* 讓它佔滿寬度 */
+      margin-top:28px;
+      display:block;
       margin-left: auto; margin-right: auto;
       padding:4px 0;
       border-radius:6px;
@@ -122,13 +120,12 @@
       line-height:1.2;
       font-size: 13px;
       width: 90%; 
-      max-width: 60px; /* 限制最大寬度 */
+      max-width: 60px;
     }
     .full{background:var(--bad); color: #b71c1c; border-color: #ef9a9a;}
     .free{background:var(--ok); color: #1b5e20; border-color: #a5d6a7;}
     .loading{background:#f5f5f5; color:#aaa; border:1px dashed #ddd; font-size: 11px;}
 
-    /* 過去的日期顯示灰色，而不是消失 */
     .past-state {
       background: #f9f9f9; color: #ddd; border-color: #eee;
       pointer-events: none;
@@ -144,10 +141,19 @@
 
     .weekend{background:var(--pink)}
     .muted{color:#aaa}
-    .past{opacity:1; background: #fff;} /* 移除整格透明，改用文字變淡 */
-    .past .dateNo { color: #ccc; } /* 日期數字變淡 */
+    .past{opacity:1; background: #fff;}
+    .past .dateNo { color: #ccc; }
 
-    .footer{margin-top:20px;color:#666;font-size:12px; text-align: center;}
+    /* ★ 修正：頁尾改為紅色警告色，並加粗 */
+    .footer{
+      margin-top:20px;
+      margin-bottom: 60px; /* 留一點空間給浮動按鈕 */
+      color: #d32f2f;      /* 紅色 */
+      font-size: 13px;
+      font-weight: 700;    /* 加粗 */
+      text-align: center;
+    }
+    
     .counts{font-variant-numeric:tabular-nums; font-size: 13px;}
     .notice{
       color:#d32f2f; font-weight:600; text-align:center; margin-bottom:16px; 
@@ -157,6 +163,36 @@
     .notice a { color: #d32f2f; text-decoration: underline; }
     .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#fff; font-size: 12px;}
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
+
+    /* ★ 新增：回到頂部按鈕樣式 */
+    .btn-top {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      z-index: 99;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+    }
+    .btn-top.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .btn-top:active { transform: scale(0.95); }
 
     @media (max-width: 768px){
       .grid{grid-template-columns:1fr}
@@ -170,7 +206,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿</h2>
+    <h2>一斗夢包棟民宿 | 空房查詢表</h2>
     <p class="notice">
       如需訂房請撥打電話：
       <a href="tel:0905385388">0905385388</a><br>
@@ -201,6 +237,8 @@
       <div>房況僅供參考 | 以小管家回覆為主</div>
     </div>
   </div>
+
+  <button id="btnTop" class="btn-top" aria-label="回到頂部">↑</button>
 
   <script>
     // ====== 常數 ======
@@ -267,14 +305,9 @@
     }
 
     async function loadYearAndRender(){
-      // 1. 介面先顯示
       renderCalendars(); 
       elSync.textContent = '讀取中...';
-      
-      // 2. 抓資料
       await ensureYearsLoadedForView();
-      
-      // 3. 更新介面
       renderCalendars();
       elSync.textContent = '更新於 ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
@@ -336,12 +369,9 @@
           const yearData = CACHE[y];
 
           if (!yearData) {
-            // 資料未到
             inner += `<span class="state loading">...</span>`;
           } else {
-            // 資料已到
             if (isPast) {
-              // 過去日期顯示灰色的「已過」，撐開高度
               inner += `<span class="state past-state">已過</span>`;
             } else {
               const state = (yearData[dstr] || 'free');
@@ -433,10 +463,22 @@
     document.getElementById('btnReload').addEventListener('click', goToday);
     document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3));
     document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));
+    
+    // ★ 新增：回到頂部按鈕邏輯
+    const btnTop = document.getElementById('btnTop');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 300) {
+        btnTop.classList.add('show');
+      } else {
+        btnTop.classList.remove('show');
+      }
+    });
+    btnTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     (async function(){
       initSelectors();
-      // 已移除顯示 API 連結的 JS，避免錯誤
       await loadYearAndRender();
       elMonth.addEventListener('change', reloadNow);
     })();
