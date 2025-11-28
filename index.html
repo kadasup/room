@@ -15,8 +15,9 @@
     :root{
       --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
       --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
-      --today:#fff8d6; /* 今天的背景色 */
+      --today:#fff8d6;
       --border:#dcdcdc; --sticky:#ffffffee;
+      --holiday-text: #e53935; /* 假日文字紅 */
     }
     *{box-sizing:border-box}
     
@@ -50,7 +51,7 @@
       padding:8px; border:1px solid var(--border); border-radius:8px; background:#fff; color:#000; font-size: 15px;
     }
 
-    /* 一般按鈕樣式 */
+    /* 按鈕樣式 */
     button{
       padding:10px 14px;
       background:var(--brand);
@@ -63,20 +64,13 @@
       transition: background .2s;
     }
     button:active{transform: scale(0.98);}
-    button:hover{background:var(--brand-600)} /* 這是造成手機卡色的元兇 */
+    button:hover{background:var(--brand-600)}
 
-    /* ★ 修正重點 1：強制覆蓋次要按鈕的 Hover 狀態 */
-    /* 使用 button.secondary 提高權重，確保它永遠是淡藍色系 */
-    button.secondary{
-      background:#e9eefb;
-      color:#0f2d62;
-    }
+    /* 次要按鈕強制淡色 */
+    button.secondary{ background:#e9eefb; color:#0f2d62; }
     button.secondary:hover, 
     button.secondary:focus, 
-    button.secondary:active {
-      background: #dce5f6; /* 點擊時只稍微變深一點點，維持淡藍色 */
-      color: #0f2d62;
-    }
+    button.secondary:active { background: #dce5f6; color: #0f2d62; }
 
     .legend{
       display:flex;
@@ -120,7 +114,21 @@
       cursor:default;
     }
     .day:first-child{border-left:none}
+    
+    /* 日期數字 */
     .dateNo{position:absolute;left:4px;top:4px;font-size:11px;color:#555;z-index:2; font-family: monospace;}
+    
+    /* 假日樣式 */
+    .is-holiday .dateNo { color: var(--holiday-text); font-weight: bold; }
+    .holiday-name {
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      font-size: 10px;
+      color: var(--holiday-text);
+      font-weight: bold;
+      z-index: 2;
+    }
 
     .state{
       margin-top:28px;
@@ -147,15 +155,18 @@
     .call-link{text-decoration:none; color:inherit; display: block;}
 
     .is-today{background:var(--today)}
+    
     .today-dot{
-      position:absolute; right:4px; top:4px;
+      position:absolute; right:4px; top:18px; 
       width:6px; height:6px; border-radius:50%; background:#e53935; box-shadow:0 0 0 2px #fff;
     }
+    .day:not(.is-holiday) .today-dot { top: 4px; }
 
     .weekend{background:var(--pink)}
     .muted{color:#aaa}
     .past{opacity:1; background: #fff;}
     .past .dateNo { color: #ccc; }
+    .past .holiday-name { color: #e57373; opacity: 0.6; }
 
     .footer{
       margin-top:20px;
@@ -177,32 +188,14 @@
     .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
 
     .btn-top {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: var(--brand);
-      color: #fff;
-      border: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      z-index: 99;
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(10px);
-      transition: all 0.3s ease;
+      position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px;
+      border-radius: 50%; background: var(--brand); color: #fff; border: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; z-index: 99; opacity: 0; visibility: hidden;
+      transform: translateY(10px); transition: all 0.3s ease;
     }
-    .btn-top.show {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-    }
+    .btn-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
     .btn-top:active { transform: scale(0.95); }
 
     @media (max-width: 768px){
@@ -217,7 +210,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h2>一斗夢包棟民宿 | 空房表</h2>
+    <h2>一斗夢包棟民宿</h2>
     <p class="notice">
       如需訂房請撥打電話：
       <a href="tel:0905385388">0905385388</a><br>
@@ -238,8 +231,8 @@
     <div class="legend">
       <span><span class="dot" style="background:var(--ok)"></span>可售</span>
       <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-      <span class="chip" style="background:var(--today); border-color:#e6e6e6"><span class="today-dot"></span> 今天</span>
-      <span class="chip muted" style="border:none; background:transparent">灰色為已過日期</span>
+      <span class="chip" style="background:var(--today); border-color:#e6e6e6"><span class="today-dot" style="position:static;display:inline-block"></span> 今天</span>
+      <span class="chip muted" style="border:none; background:transparent">紅字為國定假日</span>
     </div>
 
     <div id="calendars" class="grid" aria-label="三個月月曆"></div>
@@ -254,6 +247,10 @@
   <script>
     // ====== 常數 ======
     const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
+    
+    // ★ 假日資料儲存處 (自動聯網更新)
+    const HOLIDAYS = {}; 
+    const FETCHED_YEARS = new Set(); // 記錄已經抓過哪一年的假日
     // =============================================
 
     const CACHE = {}; 
@@ -262,6 +259,44 @@
     const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const todayStr = fmt(new Date());
     const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
+
+    // ★ 1. 抓取假日資料的函數 (來源：政府行政機關辦公日曆表開源 API)
+    async function loadTaiwanHolidays(year) {
+      if (FETCHED_YEARS.has(year)) return; // 抓過就不抓
+      
+      const url = `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('No holiday data');
+        const list = await res.json();
+        
+        list.forEach(item => {
+          if (item.isHoliday && item.description) {
+            // 轉換日期格式 20250101 -> 2025-01-01
+            const d = item.date;
+            const dateStr = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+            
+            // 簡化名稱
+            let name = item.description;
+            if (name.includes('開國紀念日')) name = '元旦';
+            else if (name.includes('和平紀念日')) name = '228';
+            else if (name.includes('國慶')) name = '國慶';
+            else if (name.includes('兒童') && name.includes('掃墓')) name = '清明兒童';
+            else if (name.includes('除夕')) name = '除夕';
+            else if (name.includes('春節')) name = '春節';
+            else if (name.includes('端午')) name = '端午';
+            else if (name.includes('中秋')) name = '中秋';
+            
+            HOLIDAYS[dateStr] = name;
+          }
+        });
+        FETCHED_YEARS.add(year);
+      } catch (e) {
+        console.warn(`無法載入 ${year} 年假日:`, e);
+        // 失敗時避免重複嘗試
+        FETCHED_YEARS.add(year);
+      }
+    }
 
     async function apiGet(year){
       const u = new URL(API_BASE);
@@ -308,11 +343,20 @@
         if (m > 12) { y += Math.floor((m - 1) / 12); }
         years.add(y);
       }
-      const tasks = [];
+      
+      // ★ 2. 確保這些年份的假日也一併載入
+      const holidayTasks = [];
       for (const y of years) {
-        if (!CACHE[y]) { tasks.push(apiGet(y)); }
+        holidayTasks.push(loadTaiwanHolidays(y));
       }
-      if (tasks.length) { await Promise.all(tasks); }
+      
+      const apiTasks = [];
+      for (const y of years) {
+        if (!CACHE[y]) { apiTasks.push(apiGet(y)); }
+      }
+      
+      // 同時等待：假日資料 + 房況資料
+      await Promise.all([...holidayTasks, ...apiTasks]);
     }
 
     async function loadYearAndRender(){
@@ -368,13 +412,22 @@
           const dstr = ymd(y,m,day);
           const isPast = dstr < todayStr;
           const isToday = dstr === todayStr;
+          
+          // ★ 3. 從自動抓取的 HOLIDAYS 物件中檢查
+          const holidayName = HOLIDAYS[dstr];
 
           td.className = 'day'
             + (isWeekend(y,m,day)?' weekend':'')
             + (isToday?' is-today':'')
-            + (isPast?' past':'');
+            + (isPast?' past':'')
+            + (holidayName ? ' is-holiday' : '');
 
           let inner = `<span class="dateNo">${day}</span>`;
+          
+          if (holidayName) {
+            inner += `<span class="holiday-name">${holidayName}</span>`;
+          }
+
           if (isToday) inner += `<span class="today-dot"></span>`;
           
           const yearData = CACHE[y];
