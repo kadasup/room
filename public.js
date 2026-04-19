@@ -1,118 +1,114 @@
-// public.js
-// 前台（客人查詢用）唯讀日曆
-
-// ===== 常數（請確認與後台使用同一個 /exec）======
 const API_BASE_PUBLIC =
   'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
-// =============================================
 
-// 主要 DOM
-const elMonthPub = document.getElementById('startMonth');
-const elCalsPub = document.getElementById('calendars');
-const elLastPub = document.getElementById('lastSync');
+const holidayAliases = [
+  ['中華民國開國紀念日', '元旦'],
+  ['和平紀念日', '228'],
+  ['兒童節及民族掃墓節', '兒童節/清明'],
+  ['民族掃墓節', '清明'],
+  ['勞動節', '勞動節'],
+  ['端午節', '端午'],
+  ['中秋節', '中秋'],
+  ['國慶日', '雙十'],
+  ['農曆除夕', '除夕'],
+  ['春節', '春節'],
+];
 
-// 電話號碼：優先讀 body data-phone，其次 fallback 固定號碼
-const PHONE =
-  document.body.dataset.phone || '0905385388';
-
-// 建立共用日曆核心（唯讀）
-const publicCalendar = RoomCalendar.create({
-  apiBase: API_BASE_PUBLIC,
-  monthInput: elMonthPub,
-  calendarsContainer: elCalsPub,
-  lastSyncEl: elLastPub,
-  viewSpanMonths: 3,
-  renderCell: ({
-    day,
-    dstr,
-    isPast,
-    isToday,
-    state,
-    td,
-  }) => {
-    let inner = `<span class="dateNo">${day}</span>`;
-    if (isToday) inner += `<span class="today-dot"></span>`;
-
-    if (!isPast) {
-      if (state === 'full') {
-        inner += `<span class="state full">已滿</span>`;
-      } else {
-        inner += `<a href="tel:${PHONE}" class="call-link"><span class="state free">可售</span></a>`;
-      }
-    }
-    td.innerHTML = inner;
-  },
-});
-
-// 顯示 API URL
-const apiSpanPub = document.getElementById('apiBase');
-if (apiSpanPub) {
-  apiSpanPub.textContent = API_BASE_PUBLIC;
-  apiSpanPub.addEventListener('click', () =>
-    window.open(API_BASE_PUBLIC, '_blank')
-  );
+function normalizeHolidayName(name) {
+  for (const entry of holidayAliases) {
+    if (name.includes(entry[0])) return entry[1];
+  }
+  return name.replace(/\s+/g, '').slice(0, 8);
 }
 
-// 抓目前起始月份的 3 個月（保留原本「讀取中…」按鈕狀態）
-async function reloadNowPub() {
-  const btn = document.getElementById('btnReload');
-  const last = elLastPub;
+async function loadTaiwanHolidays(year) {
+  const url = `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`holiday fetch failed: ${res.status}`);
+  }
+
+  const list = await res.json();
+  const out = {};
+  list.forEach((item) => {
+    if (!item.isHoliday || !item.description) return;
+    const d = item.date;
+    const dateStr = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+    out[dateStr] = normalizeHolidayName(item.description);
+  });
+  return out;
+}
+
+const publicPage = {
+  monthInput: document.getElementById('startMonth'),
+  calendars: document.getElementById('calendars'),
+  lastSync: document.getElementById('lastSync'),
+  summary: document.getElementById('summaryText'),
+  btnPrev: document.getElementById('btnPrev3'),
+  btnNext: document.getElementById('btnNext3'),
+  btnReload: document.getElementById('btnReload'),
+  btnTop: document.getElementById('btnTop'),
+};
+
+const publicCalendar = RoomCalendar.create({
+  apiBase: API_BASE_PUBLIC,
+  monthInput: publicPage.monthInput,
+  calendarsContainer: publicPage.calendars,
+  lastSyncEl: publicPage.lastSync,
+  summaryEl: publicPage.summary,
+  viewSpanMonths: 3,
+  contactPhone: document.body.dataset.phone || '0905385388',
+  holidayLoader: loadTaiwanHolidays,
+});
+
+async function reloadPublicCalendar({ goToday = false } = {}) {
+  const btn = publicPage.btnReload;
+
   try {
     if (btn) {
       btn.disabled = true;
-      btn.textContent = '讀取中…';
+      btn.textContent = '同步中...';
     }
-    if (last) last.textContent = '讀取中…';
-
+    if (goToday) {
+      publicCalendar.goToday();
+    }
     await publicCalendar.reload();
-
-    if (last)
-      last.textContent =
-        '讀取於 ' + new Date().toLocaleString();
-  } catch (err) {
-    console.error(err);
-    alert(
-      '重新載入失敗：' +
-        (err && err.message ? err.message : err)
-    );
-    if (last) last.textContent = '讀取失敗';
+  } catch (error) {
+    console.error(error);
+    alert('資料同步失敗，請稍後再試。');
+    if (publicPage.lastSync) {
+      publicPage.lastSync.textContent = '同步失敗';
+    }
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '今天';
+      btn.textContent = '回到本月';
     }
   }
 }
 
-// 「今天」按鈕：跳回今天所在月份（限制在 min/max 內）再讀取
-function goTodayAndReloadPub() {
-  publicCalendar.goToday();
-  reloadNowPub();
+publicPage.btnReload.addEventListener('click', () =>
+  reloadPublicCalendar({ goToday: true })
+);
+publicPage.btnPrev.addEventListener('click', () => {
+  publicCalendar.shiftMonths(-3);
+  reloadPublicCalendar();
+});
+publicPage.btnNext.addEventListener('click', () => {
+  publicCalendar.shiftMonths(3);
+  reloadPublicCalendar();
+});
+publicPage.monthInput.addEventListener('change', () => reloadPublicCalendar());
+
+window.addEventListener('scroll', () => {
+  if (!publicPage.btnTop) return;
+  publicPage.btnTop.classList.toggle('show', window.scrollY > 280);
+});
+
+if (publicPage.btnTop) {
+  publicPage.btnTop.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 }
 
-// 位移月份 n（例如 +/-3 個月）再讀取
-function shiftMonthsAndReloadPub(n) {
-  publicCalendar.shiftMonths(n);
-  reloadNowPub();
-}
-
-// 事件綁定
-document
-  .getElementById('btnReload')
-  .addEventListener('click', goTodayAndReloadPub);
-document
-  .getElementById('btnPrev3')
-  .addEventListener('click', () =>
-    shiftMonthsAndReloadPub(-3)
-  );
-document
-  .getElementById('btnNext3')
-  .addEventListener('click', () =>
-    shiftMonthsAndReloadPub(3)
-  );
-
-// 初始化：第一次載入畫面
-(async function () {
-  await reloadNowPub();
-  elMonthPub.addEventListener('change', reloadNowPub);
-})();
+reloadPublicCalendar({ goToday: true });

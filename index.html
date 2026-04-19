@@ -2,549 +2,165 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>一斗夢包棟民宿 | 空房表（查詢）</title>
-  
-  <meta property="og:title" content="一斗夢包棟民宿 | 即時房況查詢" />
-  <meta property="og:description" content="查看一斗夢最新空房表，歡迎包棟預訂！" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>逸豆夢房型檔期 | 即時空房查詢</title>
+  <meta
+    name="description"
+    content="快速查看逸豆夢未來三個月房型檔期，立即確認可預約日並直接聯絡訂房。"
+  />
+  <meta property="og:title" content="逸豆夢房型檔期 | 即時空房查詢" />
+  <meta
+    property="og:description"
+    content="查看未來三個月檔期、節日標記與即時客滿狀態，適合手機與桌面瀏覽。"
+  />
   <meta property="og:url" content="https://kadasup.github.io/room/" />
   <meta property="og:image" content="https://kadasup.github.io/room/cover.jpg" />
   <meta property="og:type" content="website" />
-
-  <style>
-    :root{
-      --bg:#f7f8fa; --fg:#222; --muted:#666; --brand:#1363df; --brand-600:#0f57c5;
-      --ok:#c8e6c9; --bad:#ffcdd2; --pink:#fff8f8;
-      --today:#fff8d6;
-      --border:#dcdcdc; --sticky:#ffffffee;
-      --holiday-text: #e53935;
-    }
-    *{box-sizing:border-box}
-    
-    body{
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",Arial,Helvetica,sans-serif;
-      margin: 16px 12px;
-      background:var(--bg);
-      color:var(--fg);
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    h2{margin:6px 0 8px;text-align:center; font-size: 1.4rem;}
-    .wrap{max-width:1100px;margin:0 auto}
-
-    /* --- 操作面板 --- */
-    .controls{
-      display:grid;
-      grid-template-columns: auto auto auto auto auto 1fr;
-      gap: 10px;
-      align-items:center;
-      background:#fff;
-      padding:12px;
-      border:1px solid var(--border);
-      border-radius:12px;
-      margin-bottom:12px;
-      box-shadow:0 1px 2px rgba(0,0,0,.04);
-    }
-    
-    label{display:flex;gap:8px;align-items:center;color:var(--muted); font-weight: 500;}
-    input[type="month"]{
-      padding:8px; border:1px solid var(--border); border-radius:8px; background:#fff; color:#000; font-size: 15px;
-    }
-
-    /* 按鈕樣式 */
-    button{
-      padding:10px 14px;
-      background:var(--brand);
-      border:none;
-      color:#fff;
-      border-radius:8px;
-      cursor:pointer;
-      font-weight:600;
-      font-size: 14px;
-      transition: background .2s;
-    }
-    button:active{transform: scale(0.98);}
-    button:hover{background:var(--brand-600)}
-
-    button.secondary{ background:#e9eefb; color:#0f2d62; }
-    button.secondary:hover, 
-    button.secondary:focus, 
-    button.secondary:active { background: #dce5f6; color: #0f2d62; }
-
-    .legend{
-      display:flex;
-      flex-wrap: wrap;
-      gap:8px 16px;
-      align-items:center;
-      font-size:13px;
-      color:#444;
-      margin:6px 0 14px;
-      justify-content: center;
-    }
-    .dot{width:12px;height:12px;border-radius:4px;display:inline-block;border:1px solid var(--border);margin-right:4px; vertical-align: middle;}
-    
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-    
-    .calendar{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02);}
-    .cal-head{
-      display:flex; justify-content:space-between; align-items:center;
-      padding:12px 12px;
-      border-bottom:1px solid var(--border);
-      background:var(--sticky);
-      position:sticky; top:0; z-index:10;
-    }
-    .cal-title{font-weight:700; font-size: 1.1rem;}
-
-    table{width:100%;border-collapse:separate;border-spacing:0; table-layout: fixed;}
-    th,td{border-bottom:1px solid var(--border);padding:4px 2px;text-align:center}
-    
-    thead th{
-      font-size:12px; color:#666; background:#fafafa;
-      position:sticky; top:50px; z-index:9;
-      padding-top:10px; padding-bottom:10px;
-    }
-
-    .day{
-      border-left:1px solid var(--border);
-      height: 72px;
-      vertical-align:top;
-      position:relative;
-      background:#fff;
-      cursor:default;
-    }
-    .day:first-child{border-left:none}
-    
-    .dateNo{position:absolute;left:4px;top:4px;font-size:11px;color:#555;z-index:2; font-family: monospace;}
-    
-    /* 假日樣式 */
-    .is-holiday .dateNo { color: var(--holiday-text); font-weight: bold; }
-    .holiday-name {
-      position: absolute;
-      right: 4px;
-      top: 4px;
-      font-size: 10px;
-      color: var(--holiday-text);
-      font-weight: bold;
-      z-index: 2;
-    }
-
-    /* ★ 修改重點：設定固定高度，確保沒字時也是一個漂亮的方塊 */
-    .state{
-      margin-top:28px;
-      display:flex;        /* 改用 flex 讓文字(如果有的話)居中 */
-      justify-content: center;
-      align-items: center;
-      margin-left: auto; margin-right: auto;
-      height: 24px;        /* 固定高度，這樣拿掉文字後不會變扁 */
-      border-radius:6px;
-      border:1px solid var(--border);
-      font-weight:600;
-      font-size: 13px;
-      width: 90%; 
-      max-width: 60px;
-    }
-    .full{background:var(--bad); color: #b71c1c; border-color: #ef9a9a;}
-    .free{background:var(--ok); color: #1b5e20; border-color: #a5d6a7;}
-    .loading{background:#f5f5f5; color:#aaa; border:1px dashed #ddd; font-size: 11px;}
-
-    .past-state {
-      background: #f9f9f9; color: #ddd; border-color: #eee;
-      pointer-events: none;
-    }
-
-    .call-link{text-decoration:none; color:inherit; display: block;}
-
-    .is-today{background:var(--today)}
-    
-    .today-dot{
-      position:absolute; right:4px; top:18px; 
-      width:6px; height:6px; border-radius:50%; background:#e53935; box-shadow:0 0 0 2px #fff;
-    }
-    .day:not(.is-holiday) .today-dot { top: 4px; }
-
-    .weekend{background:var(--pink)}
-    .muted{color:#aaa}
-    .past{opacity:1; background: #fff;}
-    .past .dateNo { color: #ccc; }
-    .past .holiday-name { color: #e57373; opacity: 0.6; }
-
-    .footer{
-      margin-top:20px;
-      margin-bottom: 60px;
-      color: #d32f2f;
-      font-size: 13px;
-      font-weight: 700;
-      text-align: center;
-    }
-    
-    .counts{font-variant-numeric:tabular-nums; font-size: 13px;}
-    .notice{
-      color:#d32f2f; font-weight:600; text-align:center; margin-bottom:16px; 
-      font-size: 14px; line-height: 1.5;
-      background: #ffebee; padding: 10px; border-radius: 8px;
-    }
-    .notice a { color: #d32f2f; text-decoration: underline; }
-    .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#fff; font-size: 12px;}
-    .link{color:#0b5bd3;text-decoration:underline;cursor:pointer}
-
-    .btn-top {
-      position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px;
-      border-radius: 50%; background: var(--brand); color: #fff; border: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2); cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; z-index: 99; opacity: 0; visibility: hidden;
-      transform: translateY(10px); transition: all 0.3s ease;
-    }
-    .btn-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
-    .btn-top:active { transform: scale(0.95); }
-
-    @media (max-width: 768px){
-      .grid{grid-template-columns:1fr}
-      .controls{ display: flex; flex-wrap: wrap; gap: 10px; }
-      .controls label { width: 100%; justify-content: space-between; }
-      .controls label input { flex-grow: 1; text-align: center; }
-      #btnPrev3, #btnNext3, #btnReload { flex: 1; padding: 12px 0; text-align: center; font-size: 13px; }
-      #lastSync { margin-left: auto; font-size: 11px; color: #888; border: none; background: transparent; padding: 0; }
-    }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=Noto+Serif+TC:wght@700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
-  <div class="wrap">
-    <h2>一斗夢包棟民宿 | 空房表</h2>
-    <p class="notice">
-      訂房：
-      <a href="tel:0905385388">0905385388</a><br>
-      Line ID：
-      <a href="https://line.me/R/ti/p/@518bytys" target="_blank" rel="noopener">@518bytys</a>
-    </p>
+<body data-phone="0905385388">
+  <main class="page-shell">
+    <section class="hero">
+      <span class="hero-tag">逸豆夢房型檔期</span>
+      <div class="hero-grid">
+        <div>
+          <h1 class="hero-title">即時查看未來三個月空房，喜歡的日期直接聯絡我們。</h1>
+          <p class="hero-copy">
+            頁面會自動顯示最新檔期、台灣假日與今日位置。綠色代表仍可預約，紅色代表已客滿；
+            若看到可預約日期，點一下就能直接撥打電話。
+          </p>
+        </div>
+        <div class="hero-media">
+          <aside class="stats-card" aria-label="檔期摘要">
+            <p class="stats-title">檔期速覽</p>
+            <div class="stats-grid">
+              <div class="stat-chip">
+                <strong>3 個月</strong>
+                <span>一次查看完整趨勢</span>
+              </div>
+              <div class="stat-chip">
+                <strong id="summaryText">正在載入中...</strong>
+                <span>即時統計可預約天數</span>
+              </div>
+              <div class="stat-chip">
+                <strong>行動優先</strong>
+                <span>手機也能清楚查看</span>
+              </div>
+            </div>
+          </aside>
+          <figure class="hero-image-card">
+            <img src="./cover.jpg" alt="逸豆夢住宿空間照片" />
+            <figcaption class="hero-image-caption">
+              <strong>放鬆、聚會、慢慢住</strong>
+              <span>用簡單清楚的月曆，先找到時間，再把旅行節奏留給自己。</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+      <div class="contact-card">
+        <div class="contact-row">
+          <div>
+            <div class="contact-label">電話訂房</div>
+            <div class="contact-value"><a href="tel:0905385388">0905-385388</a></div>
+          </div>
+          <div>
+            <div class="contact-label">Line</div>
+            <div class="contact-value">
+              <a href="https://line.me/R/ti/p/@518bytys" target="_blank" rel="noopener">
+                @518bytys
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="contact-actions">
+          <a class="button button-primary" href="tel:0905385388">立即來電</a>
+          <a
+            class="button button-secondary"
+            href="https://line.me/R/ti/p/@518bytys"
+            target="_blank"
+            rel="noopener"
+          >
+            加入 Line 詢問
+          </a>
+        </div>
+      </div>
+    </section>
 
-    <div class="controls">
-      <label>查詢月份
-        <input id="startMonth" type="month">
+    <section class="toolbar" aria-label="檔期控制列">
+      <label class="field" for="startMonth">
+        <span class="field-label">起始月份</span>
+        <input id="startMonth" type="month" />
       </label>
-      <button id="btnPrev3" class="secondary">← 上一季</button>
-      <button id="btnReload" class="secondary">回到本月</button>
-      <button id="btnNext3" class="secondary">下一季 →</button>
-      <span id="lastSync" class="chip">未同步</span>
-    </div>
+      <button id="btnPrev3" class="button button-ghost month-action" type="button">
+        往前 3 個月
+      </button>
+      <button id="btnReload" class="button button-primary month-action" type="button">
+        回到本月
+      </button>
+      <button id="btnNext3" class="button button-secondary month-action" type="button">
+        往後 3 個月
+      </button>
+      <div id="lastSync" class="status-chip" aria-live="polite">等待同步</div>
+    </section>
 
-    <div class="legend">
-      <span><span class="dot" style="background:var(--ok)"></span>可售</span>
-      <span><span class="dot" style="background:var(--bad)"></span>已滿</span>
-      <span class="chip" style="background:var(--today); border-color:#e6e6e6"><span class="today-dot" style="position:static;display:inline-block"></span> 今天</span>
-      <span class="chip muted" style="border:none; background:transparent">紅字為國定假日</span>
-    </div>
+    <section class="legend" aria-label="狀態說明">
+      <span class="legend-item"><span class="legend-dot ok"></span>可預約</span>
+      <span class="legend-item"><span class="legend-dot bad"></span>已客滿</span>
+      <span class="legend-item"><span class="legend-dot today"></span>今天</span>
+      <span class="legend-item"><span class="legend-dot weekend"></span>週末底色</span>
+      <span class="legend-item">節日名稱會顯示在日期右上角</span>
+    </section>
 
-    <div id="calendars" class="grid" aria-label="三個月月曆"></div>
+    <div id="calendars" class="calendar-grid" aria-label="三個月月曆"></div>
 
-    <div class="footer">
-      <div>房況僅供參考 | 以小管家回覆為主</div>
-    </div>
-  </div>
+    <section class="story-grid" aria-label="住宿亮點">
+      <article class="story-card">
+        <h3>即時房況，不必來回確認</h3>
+        <p>先用月曆快速排除已滿日期，再直接電話或 Line 聯絡，省下反覆詢問的時間。</p>
+      </article>
+      <article class="story-card">
+        <h3>假日與週末一眼就懂</h3>
+        <p>節日名稱、週末底色與今日標記都會顯示，特別適合安排家庭聚會和連假旅行。</p>
+      </article>
+      <article class="story-card">
+        <h3>手機查詢也順手</h3>
+        <p>版面針對小螢幕重新排版，按鈕大小、資訊層級與月曆密度都更適合行動裝置。</p>
+      </article>
+    </section>
 
-  <button id="btnTop" class="btn-top" aria-label="回到頂部">↑</button>
+    <section class="flow-grid" aria-label="預約流程">
+      <article class="flow-step" data-step="1">
+        <h3>挑日期</h3>
+        <p>先從未來三個月裡找出還可預約的日期，紅色代表已客滿，綠色代表可聯絡確認。</p>
+      </article>
+      <article class="flow-step" data-step="2">
+        <h3>立即聯絡</h3>
+        <p>看到適合的日期後，可直接來電或加入 Line，把入住需求與人數一次告訴我們。</p>
+      </article>
+      <article class="flow-step" data-step="3">
+        <h3>完成保留</h3>
+        <p>確認房況後，我們會協助你完成保留與入住資訊說明，讓行程安排更安心。</p>
+      </article>
+    </section>
 
-  <script>
-    // ====== 常數 ======
-    const API_BASE = 'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
-    
-    // 假日資料儲存處
-    const HOLIDAYS = {}; 
-    const FETCHED_YEARS = new Set(); 
-    // =============================================
+    <section class="info-banner">
+      <strong>提醒：</strong>
+      顯示結果會依照後台即時更新。若你看中的日期顯示可預約，建議直接來電或透過 Line
+      確認，以便我們立即協助保留。
+    </section>
 
-    const CACHE = {}; 
+    <p class="footnote">逸豆夢保留調整房況的權利，實際可售狀態以聯繫確認為準。</p>
+  </main>
 
-    const fmt = (d)=>d.toISOString().slice(0,10);
-    const ymd = (y,m,day)=>`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const todayStr = fmt(new Date());
-    const isWeekend = (y,m,day)=>{ const wd=new Date(y,m-1,day).getDay(); return wd===0 || wd===6; };
+  <button id="btnTop" class="back-to-top" type="button" aria-label="回到頁面頂端">↑</button>
 
-    // 抓取假日資料
-    async function loadTaiwanHolidays(year) {
-      if (FETCHED_YEARS.has(year)) return;
-      
-      const url = `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('No holiday data');
-        const list = await res.json();
-        
-        list.forEach(item => {
-          if (item.isHoliday && item.description) {
-            const d = item.date;
-            const dateStr = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
-            
-            let name = item.description;
-            if (name.includes('開國紀念日')) name = '元旦';
-            else if (name.includes('和平紀念日')) name = '228';
-            else if (name.includes('國慶')) name = '國慶';
-            else if (name.includes('兒童') && name.includes('掃墓')) name = '清明兒童';
-            else if (name.includes('除夕')) name = '除夕';
-            else if (name.includes('春節')) name = '春節';
-            else if (name.includes('端午')) name = '端午';
-            else if (name.includes('中秋')) name = '中秋';
-            else if (name.includes('孔子')) name = '教師';
-            else if (name.includes('光復')) name = '光復';
-            else if (name.includes('行憲')) name = '行憲';
-            
-            HOLIDAYS[dateStr] = name;
-          }
-        });
-        FETCHED_YEARS.add(year);
-      } catch (e) {
-        console.warn(`無法載入 ${year} 年假日:`, e);
-        FETCHED_YEARS.add(year);
-      }
-    }
-
-    async function apiGet(year){
-      const u = new URL(API_BASE);
-      u.searchParams.set('year', String(year));
-      u.searchParams.set('t', Date.now()); 
-      try {
-        const res = await fetch(u.toString(), { headers:{ 'Accept':'application/json' }, cache:'no-store' });
-        if(!res.ok) throw new Error('GET failed '+res.status);
-        const json = await res.json();
-        CACHE[year] = json?.status || {};
-        return json;
-      } catch (e) {
-        console.error("API Error:", e);
-        CACHE[year] = {}; 
-        return {};
-      }
-    }
-
-    const elMonth = document.getElementById('startMonth');
-    const elCals = document.getElementById('calendars');
-    const elSync = document.getElementById('lastSync');
-
-    function initSelectors(){
-      const now = new Date();
-      const curYear = now.getFullYear();
-      const minMonth = `${curYear}-${String(now.getMonth()+1).padStart(2,'0')}`;
-      elMonth.min = minMonth;
-      const maxDate = new Date(now.getFullYear(), now.getMonth()+23, 1);
-      const maxMonth = `${maxDate.getFullYear()}-${String(maxDate.getMonth()+1).padStart(2,'0')}`;
-      elMonth.max = maxMonth;
-      elMonth.value = minMonth;
-    }
-
-    function monthDays(y,m){
-      const last = new Date(y, m, 0).getDate();
-      return Array.from({length:last}, (_,i)=>i+1);
-    }
-
-    async function ensureYearsLoadedForView(){
-      const [Y, M] = elMonth.value.split('-').map(v => parseInt(v, 10));
-      const years = new Set();
-      for (let k = 0; k < 3; k++) {
-        let y = Y, m = M + k;
-        if (m > 12) { y += Math.floor((m - 1) / 12); }
-        years.add(y);
-      }
-      
-      const holidayTasks = [];
-      for (const y of years) {
-        holidayTasks.push(loadTaiwanHolidays(y));
-      }
-      
-      const apiTasks = [];
-      for (const y of years) {
-        if (!CACHE[y]) { apiTasks.push(apiGet(y)); }
-      }
-      
-      await Promise.all([...holidayTasks, ...apiTasks]);
-    }
-
-    async function loadYearAndRender(){
-      renderCalendars(); 
-      elSync.textContent = '讀取中...';
-      await ensureYearsLoadedForView();
-      renderCalendars();
-      elSync.textContent = '更新於 ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    }
-
-    function renderCalendars(){
-      let [Y, M] = elMonth.value.split('-').map(v=>parseInt(v,10));
-      const [minY, minM] = elMonth.min.split('-').map(v=>parseInt(v,10));
-      const [maxY, maxM] = elMonth.max.split('-').map(v=>parseInt(v,10));
-
-      if (Y < minY || (Y===minY && M<minM)) {
-        Y = minY; M = minM;
-        elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
-      } else if (Y > maxY || (Y===maxY && M>maxM)) {
-        Y = maxY; M = maxM;
-        elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
-      }
-
-      const months = [0,1,2].map(k=>{
-        let y=Y, m=M+k;
-        if(m>12){ y += Math.floor((m-1)/12); m = ((m-1)%12)+1; }
-        return {y, m};
-      });
-
-      elCals.innerHTML = '';
-      months.forEach(({y,m})=>{
-        const cal = document.createElement('div');
-        cal.className = 'calendar';
-
-        const head = document.createElement('div');
-        head.className = 'cal-head';
-        head.innerHTML = `<div class="cal-title">${y} 年 ${m} 月</div><div class="counts" id="cnt-${y}-${m}"></div>`;
-        cal.appendChild(head);
-
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        thead.innerHTML = `<tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr>`;
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-        const firstWd = new Date(y,m-1,1).getDay();
-        const days = monthDays(y,m);
-        let row = document.createElement('tr');
-        for(let i=0;i<firstWd;i++) row.appendChild(document.createElement('td'));
-
-        days.forEach(day=>{
-          const td = document.createElement('td');
-          const dstr = ymd(y,m,day);
-          const isPast = dstr < todayStr;
-          const isToday = dstr === todayStr;
-          
-          const holidayName = HOLIDAYS[dstr];
-
-          td.className = 'day'
-            + (isWeekend(y,m,day)?' weekend':'')
-            + (isToday?' is-today':'')
-            + (isPast?' past':'')
-            + (holidayName ? ' is-holiday' : '');
-
-          let inner = `<span class="dateNo">${day}</span>`;
-          
-          if (holidayName) {
-            inner += `<span class="holiday-name">${holidayName}</span>`;
-          }
-
-          if (isToday) inner += `<span class="today-dot"></span>`;
-          
-          const yearData = CACHE[y];
-
-          if (!yearData) {
-            inner += `<span class="state loading">...</span>`;
-          } else {
-            if (isPast) {
-              // ★ 修改：移除文字，只留色塊
-              inner += `<span class="state past-state"></span>`;
-            } else {
-              const state = (yearData[dstr] || 'free');
-              if (state === 'full') {
-                // 已滿保留文字
-                inner += `<span class="state full">已滿</span>`;
-              } else {
-                // ★ 修改：可售移除文字，只留色塊
-                inner += `<a href="tel:0905385388" class="call-link"><span class="state free"></span></a>`;
-              }
-            }
-          }
-          td.innerHTML = inner;
-
-          row.appendChild(td);
-          if((firstWd + day) % 7 === 0){
-            tbody.appendChild(row);
-            row = document.createElement('tr');
-          }
-        });
-        if(row.children.length) tbody.appendChild(row);
-        table.appendChild(tbody);
-        cal.appendChild(table);
-        elCals.appendChild(cal);
-
-        if (CACHE[y]) {
-          updateCounts(y,m);
-        } else {
-          const el = document.getElementById(`cnt-${y}-${m}`);
-          if(el) el.textContent = '...';
-        }
-      });
-    }
-
-    function updateCounts(y,m){
-      const days = monthDays(y,m);
-      let full=0, free=0;
-      days.forEach(d=>{
-        const dstr = ymd(y,m,d);
-        if(dstr < todayStr) return;
-        const st = (CACHE[y]?.[dstr] || 'free');
-        if(st==='full') full++; else free++;
-      });
-      const el = document.getElementById(`cnt-${y}-${m}`);
-      if(el) el.textContent = `可售 ${free} / 已滿 ${full}`;
-    }
-
-    async function reloadNow(){
-      const btn = document.getElementById('btnReload');
-      try{
-        btn.disabled = true;
-        btn.textContent = '...';
-        await loadYearAndRender();
-      }catch(err){
-        alert('載入失敗，請檢查網路');
-        elSync.textContent = '載入錯誤';
-      }finally{
-        btn.disabled = false;
-        btn.textContent = '回到本月';
-      }
-    }
-
-    function goToday(){
-      const now = new Date();
-      let Y = now.getFullYear();
-      let M = now.getMonth() + 1;
-      
-      const [minY, minM] = elMonth.min.split('-').map(v => parseInt(v, 10));
-      if (Y < minY || (Y === minY && M < minM)) { Y = minY; M = minM; }
-      
-      elMonth.value = `${Y}-${String(M).padStart(2,'0')}`;
-      reloadNow();
-    }
-
-    function shiftMonths(n){
-      const [minY, minM] = elMonth.min.split('-').map(v=>parseInt(v,10));
-      const [maxY, maxM] = elMonth.max.split('-').map(v=>parseInt(v,10));
-      const minDate = new Date(minY, minM-1, 1);
-      const maxDate = new Date(maxY, maxM-1, 1);
-      const cur = elMonth.value.split('-').map(v=>parseInt(v,10));
-      let base = new Date(cur[0], cur[1]-1, 1);
-      base.setMonth(base.getMonth() + n);
-
-      if (base < minDate) base = minDate;
-      if (base > maxDate) base = maxDate;
-
-      elMonth.value = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}`;
-      reloadNow();
-    }
-
-    document.getElementById('btnReload').addEventListener('click', goToday);
-    document.getElementById('btnPrev3').addEventListener('click', ()=>shiftMonths(-3));
-    document.getElementById('btnNext3').addEventListener('click', ()=>shiftMonths(3));
-    
-    const btnTop = document.getElementById('btnTop');
-    window.addEventListener('scroll', () => {
-      if (window.scrollY > 300) {
-        btnTop.classList.add('show');
-      } else {
-        btnTop.classList.remove('show');
-      }
-    });
-    btnTop.addEventListener('click', () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-
-    (async function(){
-      initSelectors();
-      await loadYearAndRender();
-      elMonth.addEventListener('change', reloadNow);
-    })();
-  </script>
+  <script src="./calendar-core.js"></script>
+  <script src="./public.js"></script>
 </body>
 </html>

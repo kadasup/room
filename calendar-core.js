@@ -1,40 +1,58 @@
-// calendar-core.js
-// 共用日曆核心：快取、API 呼叫、渲染 3 個月
-
 (function (global) {
   'use strict';
 
-  function createCalendar(options) {
-    if (!options) {
-      throw new Error('RoomCalendar.create: options is required');
-    }
+  var WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+  var DEFAULT_STATUS_TEXT = {
+    free: '可預約',
+    full: '已客滿',
+    loading: '讀取中',
+    past: '已過去',
+  };
 
-    var API_BASE = options.apiBase;
-    if (!API_BASE) {
+  function createCalendar(options) {
+    if (!options || !options.apiBase) {
       throw new Error('RoomCalendar.create: apiBase is required');
     }
-
-    var ADMIN_TOKEN = options.adminToken || null;
-    var elMonth = options.monthInput;
-    var elCals = options.calendarsContainer;
-    var elLastSync = options.lastSyncEl || null;
-    var viewSpan = options.viewSpanMonths || 3;
-    var renderCell =
-      typeof options.renderCell === 'function' ? options.renderCell : null;
-
-    if (!elMonth || !elCals) {
+    if (!options.monthInput || !options.calendarsContainer) {
       throw new Error(
-        'RoomCalendar.create: monthInput & calendarsContainer are required'
+        'RoomCalendar.create: monthInput and calendarsContainer are required'
       );
     }
 
-    // { [yearNumber]: { 'YYYY-MM-DD': 'full' | 'free' } }
-    var CACHE = {};
+    var apiBase = options.apiBase;
+    var adminToken = options.adminToken || null;
+    var monthInput = options.monthInput;
+    var calendarsContainer = options.calendarsContainer;
+    var lastSyncEl = options.lastSyncEl || null;
+    var summaryEl = options.summaryEl || null;
+    var viewSpanMonths = options.viewSpanMonths || 3;
+    var contactPhone = options.contactPhone || '';
+    var statusText = Object.assign({}, DEFAULT_STATUS_TEXT, options.statusText);
+    var onCellAction =
+      typeof options.onCellAction === 'function' ? options.onCellAction : null;
+    var onStateUpdated =
+      typeof options.onStateUpdated === 'function' ? options.onStateUpdated : null;
+    var monthSummaryFormatter =
+      typeof options.monthSummaryFormatter === 'function'
+        ? options.monthSummaryFormatter
+        : defaultMonthSummaryFormatter;
+    var summaryFormatter =
+      typeof options.summaryFormatter === 'function'
+        ? options.summaryFormatter
+        : defaultSummaryFormatter;
+    var holidayLoader =
+      typeof options.holidayLoader === 'function' ? options.holidayLoader : null;
 
-    // 工具
-    function fmt(d) {
-      return d.toISOString().slice(0, 10);
+    var stateCache = {};
+    var holidayCache = {};
+    var loadedStateYears = {};
+    var loadedHolidayYears = {};
+    var todayStr = fmtDate(new Date());
+
+    function fmtDate(date) {
+      return date.toISOString().slice(0, 10);
     }
+
     function ymd(y, m, day) {
       return (
         y +
@@ -44,28 +62,85 @@
         String(day).padStart(2, '0')
       );
     }
-    var todayStr = fmt(new Date());
-
-    function isWeekend(y, m, day) {
-      var wd = new Date(y, m - 1, day).getDay();
-      return wd === 0 || wd === 6;
-    }
 
     function monthDays(y, m) {
       var last = new Date(y, m, 0).getDate();
-      var out = new Array(last);
-      for (var i = 0; i < last; i++) {
-        out[i] = i + 1;
+      var out = [];
+      for (var day = 1; day <= last; day += 1) {
+        out.push(day);
       }
       return out;
     }
 
-    // ===== API GET（防快取）=====
+    function isWeekend(y, m, day) {
+      var weekday = new Date(y, m - 1, day).getDay();
+      return weekday === 0 || weekday === 6;
+    }
+
+    function getMonthRange() {
+      var parts = monthInput.value.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10);
+      return { y: y, m: m };
+    }
+
+    function clampMonthInput() {
+      var current = getMonthRange();
+      var minParts = monthInput.min.split('-');
+      var maxParts = monthInput.max.split('-');
+      var minY = parseInt(minParts[0], 10);
+      var minM = parseInt(minParts[1], 10);
+      var maxY = parseInt(maxParts[0], 10);
+      var maxM = parseInt(maxParts[1], 10);
+
+      if (current.y < minY || (current.y === minY && current.m < minM)) {
+        monthInput.value = minY + '-' + String(minM).padStart(2, '0');
+      } else if (
+        current.y > maxY ||
+        (current.y === maxY && current.m > maxM)
+      ) {
+        monthInput.value = maxY + '-' + String(maxM).padStart(2, '0');
+      }
+    }
+
+    function initSelectors() {
+      var now = new Date();
+      var minMonth =
+        now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      var maxDate = new Date(now.getFullYear(), now.getMonth() + 23, 1);
+      var maxMonth =
+        maxDate.getFullYear() +
+        '-' +
+        String(maxDate.getMonth() + 1).padStart(2, '0');
+      monthInput.min = minMonth;
+      monthInput.max = maxMonth;
+      if (!monthInput.value) {
+        monthInput.value = minMonth;
+      }
+      clampMonthInput();
+    }
+
+    function getVisibleMonths() {
+      clampMonthInput();
+      var start = getMonthRange();
+      var out = [];
+
+      for (var index = 0; index < viewSpanMonths; index += 1) {
+        var date = new Date(start.y, start.m - 1 + index, 1);
+        out.push({
+          y: date.getFullYear(),
+          m: date.getMonth() + 1,
+        });
+      }
+
+      return out;
+    }
+
     async function apiGet(year) {
-      var u = new URL(API_BASE);
-      u.searchParams.set('year', String(year));
-      u.searchParams.set('t', Date.now().toString());
-      var res = await fetch(u.toString(), {
+      var url = new URL(apiBase);
+      url.searchParams.set('year', String(year));
+      url.searchParams.set('t', Date.now().toString());
+      var res = await fetch(url.toString(), {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       });
@@ -73,342 +148,398 @@
         throw new Error('GET failed ' + res.status);
       }
       var json = await res.json();
-      CACHE[year] = (json && json.status) || {};
-      if (elLastSync) {
-        elLastSync.textContent = '讀取於 ' + new Date().toLocaleString();
+      stateCache[year] = (json && json.status) || {};
+      loadedStateYears[year] = true;
+      return json;
+    }
+
+    async function apiPatch(year, delta) {
+      if (!adminToken) {
+        throw new Error('No admin token configured');
+      }
+      var form = new FormData();
+      form.append('token', adminToken);
+      form.append('year', String(year));
+      form.append('delta', JSON.stringify(delta));
+
+      var res = await fetch(apiBase, {
+        method: 'POST',
+        body: form,
+        redirect: 'follow',
+      });
+
+      if (!res.ok) {
+        throw new Error('POST failed ' + res.status);
+      }
+
+      var json = await res.json();
+      if (json && json.data && json.data.status) {
+        stateCache[year] = json.data.status;
       }
       return json;
     }
 
-    // ===== API POST（FormData 避免預檢）=====
-    async function apiPatch(year, delta) {
-      if (!ADMIN_TOKEN) {
-        throw new Error('No admin token configured');
+    async function ensureMetaLoaded(year) {
+      if (!holidayLoader || loadedHolidayYears[year]) {
+        return;
       }
-      var fd = new FormData();
-      fd.append('token', ADMIN_TOKEN);
-      fd.append('year', String(year));
-      fd.append('delta', JSON.stringify(delta));
-      var res = await fetch(API_BASE, {
-        method: 'POST',
-        body: fd,
-        redirect: 'follow',
+      holidayCache[year] = await holidayLoader(year);
+      loadedHolidayYears[year] = true;
+    }
+
+    async function ensureYearsLoaded() {
+      var months = getVisibleMonths();
+      var uniqueYears = {};
+      var requests = [];
+
+      months.forEach(function (month) {
+        uniqueYears[month.y] = true;
       });
-      if (!res.ok) {
-        throw new Error('POST failed ' + res.status);
-      }
-      var out = await res.json();
-      if (out && out.data && out.data.status) {
-        CACHE[year] = out.data.status;
-      }
-      if (elLastSync) {
-        elLastSync.textContent = '已寫入於 ' + new Date().toLocaleString();
-      }
-      return out;
-    }
 
-    // ===== 設定 month input 的 min / max（本月起算近兩年）=====
-    function initSelectors() {
-      var now = new Date();
-      var curYear = now.getFullYear();
-
-      // 最小：本月
-      var minMonth =
-        curYear + '-' + String(now.getMonth() + 1).padStart(2, '0');
-      elMonth.min = minMonth;
-
-      // 最大：本月起 24 個月內
-      var maxDate = new Date(now.getFullYear(), now.getMonth() + 23, 1);
-      var maxMonth =
-        maxDate.getFullYear() +
-        '-' +
-        String(maxDate.getMonth() + 1).padStart(2, '0');
-      elMonth.max = maxMonth;
-
-      if (!elMonth.value) {
-        elMonth.value = minMonth;
-      }
-    }
-
-    // 只抓畫面會用到且尚未在快取的年份
-    async function ensureYearsLoadedForView() {
-      var parts = elMonth.value.split('-');
-      var Y = parseInt(parts[0], 10);
-      var M = parseInt(parts[1], 10);
-
-      var years = {};
-      for (var k = 0; k < viewSpan; k++) {
-        var y = Y;
-        var m = M + k;
-        if (m > 12) {
-          y += Math.floor((m - 1) / 12);
-          m = ((m - 1) % 12) + 1;
+      Object.keys(uniqueYears).forEach(function (yearKey) {
+        var year = parseInt(yearKey, 10);
+        if (!loadedStateYears[year]) {
+          requests.push(apiGet(year));
         }
-        years[y] = true;
-      }
-
-      var tasks = [];
-      Object.keys(years).forEach(function (ys) {
-        var ynum = parseInt(ys, 10);
-        if (!CACHE[ynum]) {
-          tasks.push(apiGet(ynum));
+        if (holidayLoader && !loadedHolidayYears[year]) {
+          requests.push(ensureMetaLoaded(year));
         }
       });
 
-      if (tasks.length > 0) {
-        await Promise.all(tasks);
+      if (requests.length) {
+        await Promise.all(requests);
       }
     }
 
-    function updateCounts(y, m) {
-      var daysArr = monthDays(y, m);
-      var full = 0;
-      var free = 0;
-      daysArr.forEach(function (d) {
-        var dstr = ymd(y, m, d);
-        if (dstr < todayStr) {
+    function getHolidayName(dateStr) {
+      var year = parseInt(dateStr.slice(0, 4), 10);
+      return holidayCache[year] && holidayCache[year][dateStr]
+        ? holidayCache[year][dateStr]
+        : '';
+    }
+
+    function updateSyncText(text) {
+      if (lastSyncEl) {
+        lastSyncEl.textContent = text;
+      }
+    }
+
+    function summarizeVisibleMonths() {
+      var months = getVisibleMonths();
+      var summary = {
+        free: 0,
+        full: 0,
+        totalVisible: 0,
+      };
+
+      months.forEach(function (month) {
+        monthDays(month.y, month.m).forEach(function (day) {
+          var dateStr = ymd(month.y, month.m, day);
+          if (dateStr < todayStr) {
+            return;
+          }
+          var status =
+            (stateCache[month.y] && stateCache[month.y][dateStr]) || 'free';
+          summary.totalVisible += 1;
+          if (status === 'full') {
+            summary.full += 1;
+          } else {
+            summary.free += 1;
+          }
+        });
+      });
+
+      if (summaryEl) {
+        summaryEl.textContent = summaryFormatter(summary);
+      }
+
+      return summary;
+    }
+
+    function defaultSummaryFormatter(summary) {
+      return (
+        '接下來 ' +
+        String(viewSpanMonths) +
+        ' 個月共有 ' +
+        String(summary.free) +
+        ' 天可預約，' +
+        String(summary.full) +
+        ' 天已客滿'
+      );
+    }
+
+    function defaultMonthSummaryFormatter(summary) {
+      return (
+        '可預約 ' +
+        String(summary.free).padStart(2, '0') +
+        ' 天 / 已客滿 ' +
+        String(summary.full).padStart(2, '0') +
+        ' 天'
+      );
+    }
+
+    function getMonthSummary(y, m) {
+      var summary = { free: 0, full: 0 };
+      monthDays(y, m).forEach(function (day) {
+        var dateStr = ymd(y, m, day);
+        if (dateStr < todayStr) {
           return;
         }
-        var st = (CACHE[y] && CACHE[y][dstr]) || 'free';
-        if (st === 'full') {
-          full += 1;
+        var status = (stateCache[y] && stateCache[y][dateStr]) || 'free';
+        if (status === 'full') {
+          summary.full += 1;
         } else {
-          free += 1;
+          summary.free += 1;
         }
       });
-      var el = document.getElementById('cnt-' + y + '-' + m);
-      if (el) {
-        el.textContent =
-          '可售 ' +
-          String(free).padStart(2, '0') +
-          ' • 已滿 ' +
-          String(full).padStart(2, '0');
-      }
+      return summary;
     }
 
-    function renderCalendars() {
-      var parts = elMonth.value.split('-');
-      var Y = parseInt(parts[0], 10);
-      var M = parseInt(parts[1], 10);
-
-      var minParts = elMonth.min.split('-');
-      var minY = parseInt(minParts[0], 10);
-      var minM = parseInt(minParts[1], 10);
-      var maxParts = elMonth.max.split('-');
-      var maxY = parseInt(maxParts[0], 10);
-      var maxM = parseInt(maxParts[1], 10);
-
-      // clamp 在 min / max 裡面
-      if (Y < minY || (Y === minY && M < minM)) {
-        Y = minY;
-        M = minM;
-        elMonth.value =
-          Y + '-' + String(M).padStart(2, '0');
-      } else if (Y > maxY || (Y === maxY && M > maxM)) {
-        Y = maxY;
-        M = maxM;
-        elMonth.value =
-          Y + '-' + String(M).padStart(2, '0');
+    function createStateNode(status, dateStr, isPast, isLoading) {
+      var node;
+      if (isLoading) {
+        node = document.createElement('span');
+        node.className = 'state-badge loading';
+        node.textContent = statusText.loading;
+        return node;
       }
 
-      var months = [];
-      for (var k = 0; k < viewSpan; k++) {
-        var y = Y;
-        var m = M + k;
-        if (m > 12) {
-          y += Math.floor((m - 1) / 12);
-          m = ((m - 1) % 12) + 1;
-        }
-        months.push({ y: y, m: m });
+      if (isPast) {
+        node = document.createElement('span');
+        node.className = 'state-badge past';
+        node.textContent = statusText.past;
+        return node;
       }
 
-      elCals.innerHTML = '';
+      if (status === 'free' && contactPhone) {
+        node = document.createElement('a');
+        node.href = 'tel:' + contactPhone;
+      } else {
+        node = document.createElement('span');
+      }
 
-      months.forEach(function (mm) {
-        var y = mm.y;
-        var m = mm.m;
+      node.className = 'state-badge ' + (status === 'full' ? 'full' : 'free');
+      node.textContent = statusText[status] || status;
+      return node;
+    }
 
-        var cal = document.createElement('div');
-        cal.className = 'calendar';
+    function buildDayCell(y, m, day) {
+      var dateStr = ymd(y, m, day);
+      var holidayName = getHolidayName(dateStr);
+      var isPast = dateStr < todayStr;
+      var isToday = dateStr === todayStr;
+      var isLoaded = Boolean(loadedStateYears[y]);
+      var status = (stateCache[y] && stateCache[y][dateStr]) || 'free';
 
-        var head = document.createElement('div');
-        head.className = 'cal-head';
-        head.innerHTML =
-          '<div class="cal-title">' +
-          y +
-          ' 年 ' +
-          m +
-          ' 月</div><div class="counts" id="cnt-' +
-          y +
-          '-' +
-          m +
-          '"></div>';
-        cal.appendChild(head);
+      var td = document.createElement('td');
+      var cell = document.createElement('div');
+      var header = document.createElement('div');
+      var dateEl = document.createElement('span');
+      var holidayEl = document.createElement('span');
+      var todayBadge = document.createElement('span');
+      var stateEl = createStateNode(status, dateStr, isPast, !isLoaded);
 
+      cell.className =
+        'calendar-day' +
+        (isWeekend(y, m, day) ? ' weekend' : '') +
+        (isToday ? ' today' : '') +
+        (isPast ? ' past' : '') +
+        (adminToken && !isPast ? ' is-admin' : '');
+
+      header.className = 'calendar-day-header';
+      dateEl.className = 'date-number';
+      dateEl.textContent = String(day);
+      header.appendChild(dateEl);
+
+      if (holidayName) {
+        holidayEl.className = 'holiday-label';
+        holidayEl.textContent = holidayName;
+        header.appendChild(holidayEl);
+      }
+
+      cell.appendChild(header);
+
+      if (isToday) {
+        todayBadge.className = 'today-badge';
+        todayBadge.textContent = '今天';
+        cell.appendChild(todayBadge);
+      }
+
+      cell.appendChild(stateEl);
+      td.appendChild(cell);
+
+      if (adminToken && !isPast) {
+        td.addEventListener('click', async function () {
+          var current = (stateCache[y] && stateCache[y][dateStr]) || 'free';
+          var next = current === 'full' ? 'free' : 'full';
+          stateCache[y] = stateCache[y] || {};
+          stateCache[y][dateStr] = next;
+          render();
+
+          try {
+            await apiPatch(y, (function () {
+              var delta = {};
+              delta[dateStr] = next;
+              return delta;
+            })());
+            updateSyncText('已於 ' + new Date().toLocaleString() + ' 同步');
+            if (onStateUpdated) {
+              onStateUpdated({
+                y: y,
+                m: m,
+                day: day,
+                dateStr: dateStr,
+                state: next,
+              });
+            }
+          } catch (error) {
+            stateCache[y][dateStr] = current;
+            render();
+            updateSyncText('同步失敗');
+            alert(
+              '更新失敗，已還原原本狀態。' +
+                (error && error.message ? ' ' + error.message : '')
+            );
+          }
+        });
+      } else if (onCellAction) {
+        onCellAction({
+          y: y,
+          m: m,
+          day: day,
+          dateStr: dateStr,
+          isPast: isPast,
+          status: status,
+          td: td,
+          cell: cell,
+          stateNode: stateEl,
+          holidayName: holidayName,
+        });
+      }
+
+      return td;
+    }
+
+    function render() {
+      var months = getVisibleMonths();
+      calendarsContainer.innerHTML = '';
+
+      months.forEach(function (month) {
+        var wrapper = document.createElement('section');
+        var header = document.createElement('div');
+        var title = document.createElement('h2');
+        var counts = document.createElement('div');
         var table = document.createElement('table');
-
         var thead = document.createElement('thead');
+        var tbody = document.createElement('tbody');
+        var firstDay = new Date(month.y, month.m - 1, 1).getDay();
+        var days = monthDays(month.y, month.m);
+        var row = document.createElement('tr');
+
+        wrapper.className = 'calendar-card';
+        header.className = 'calendar-head';
+        title.className = 'calendar-title';
+        counts.className = 'month-counts';
+        title.textContent = month.y + ' 年 ' + month.m + ' 月';
+        counts.textContent = monthSummaryFormatter(getMonthSummary(month.y, month.m));
+        header.appendChild(title);
+        header.appendChild(counts);
+        wrapper.appendChild(header);
+
+        table.className = 'calendar-table';
         thead.innerHTML =
           '<tr>' +
-          '<th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th>' +
+          WEEKDAY_LABELS.map(function (label) {
+            return '<th scope="col">' + label + '</th>';
+          }).join('') +
           '</tr>';
         table.appendChild(thead);
 
-        var tbody = document.createElement('tbody');
-        var firstWd = new Date(y, m - 1, 1).getDay();
-        var daysArr = monthDays(y, m);
-        var row = document.createElement('tr');
-
-        for (var i = 0; i < firstWd; i++) {
-          row.appendChild(document.createElement('td'));
+        for (var gap = 0; gap < firstDay; gap += 1) {
+          var emptyTd = document.createElement('td');
+          var emptyCell = document.createElement('div');
+          emptyCell.className = 'calendar-day empty';
+          emptyTd.appendChild(emptyCell);
+          row.appendChild(emptyTd);
         }
 
-        daysArr.forEach(function (day) {
-          var td = document.createElement('td');
-          var dstr = ymd(y, m, day);
-          var isPast = dstr < todayStr;
-          var isToday = dstr === todayStr;
-          var cls = 'day';
-          if (isWeekend(y, m, day)) {
-            cls += ' weekend';
-          }
-          if (isToday) {
-            cls += ' is-today';
-          }
-          if (isPast) {
-            cls += ' past muted';
-          }
-          td.className = cls;
-
-          var state = (CACHE[y] && CACHE[y][dstr]) || 'free';
-
-          if (renderCell) {
-            renderCell({
-              y: y,
-              m: m,
-              day: day,
-              dstr: dstr,
-              isPast: isPast,
-              isToday: isToday,
-              state: state,
-              td: td,
-              todayStr: todayStr,
-              cache: CACHE,
-              apiPatch: ADMIN_TOKEN ? apiPatch : null,
-              updateCounts: function () {
-                updateCounts(y, m);
-              },
-            });
-          }
-
-          row.appendChild(td);
-          if ((firstWd + day) % 7 === 0) {
+        days.forEach(function (day) {
+          row.appendChild(buildDayCell(month.y, month.m, day));
+          if ((firstDay + day) % 7 === 0) {
             tbody.appendChild(row);
             row = document.createElement('tr');
           }
         });
 
         if (row.children.length > 0) {
+          while (row.children.length < 7) {
+            var tailTd = document.createElement('td');
+            var tailCell = document.createElement('div');
+            tailCell.className = 'calendar-day empty';
+            tailTd.appendChild(tailCell);
+            row.appendChild(tailTd);
+          }
           tbody.appendChild(row);
         }
 
         table.appendChild(tbody);
-        cal.appendChild(table);
-        elCals.appendChild(cal);
-
-        updateCounts(y, m);
+        wrapper.appendChild(table);
+        calendarsContainer.appendChild(wrapper);
       });
+
+      summarizeVisibleMonths();
     }
 
-    async function loadYearAndRender() {
-      await ensureYearsLoadedForView();
-      renderCalendars();
+    async function reload() {
+      updateSyncText('正在同步資料...');
+      await ensureYearsLoaded();
+      render();
+      updateSyncText('已於 ' + new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }) + ' 更新');
     }
 
-    // 初始化 min/max
+    function goToday() {
+      var now = new Date();
+      monthInput.value =
+        now.getFullYear() +
+        '-' +
+        String(now.getMonth() + 1).padStart(2, '0');
+      clampMonthInput();
+    }
+
+    function shiftMonths(delta) {
+      var current = getMonthRange();
+      var nextDate = new Date(current.y, current.m - 1 + delta, 1);
+      monthInput.value =
+        nextDate.getFullYear() +
+        '-' +
+        String(nextDate.getMonth() + 1).padStart(2, '0');
+      clampMonthInput();
+    }
+
     initSelectors();
 
-    // 對外 API
     return {
-      // 抓資料 + 渲染
-      reload: loadYearAndRender,
-
-      // 將起始月份設為今天所在月份（受 min/max 限制）
-      goToday: function () {
-        var now = new Date();
-        var Y = now.getFullYear();
-        var M = now.getMonth() + 1;
-
-        var minParts = elMonth.min.split('-');
-        var minY = parseInt(minParts[0], 10);
-        var minM = parseInt(minParts[1], 10);
-        var maxParts = elMonth.max.split('-');
-        var maxY = parseInt(maxParts[0], 10);
-        var maxM = parseInt(maxParts[1], 10);
-
-        if (Y < minY || (Y === minY && M < minM)) {
-          Y = minY;
-          M = minM;
-        } else if (Y > maxY || (Y === maxY && M > maxM)) {
-          Y = maxY;
-          M = maxM;
-        }
-
-        elMonth.value =
-          Y + '-' + String(M).padStart(2, '0');
-      },
-
-      // 以目前起始月份為基準，平移 n 個月
-      shiftMonths: function (n) {
-        var minParts = elMonth.min.split('-');
-        var minY = parseInt(minParts[0], 10);
-        var minM = parseInt(minParts[1], 10);
-        var maxParts = elMonth.max.split('-');
-        var maxY = parseInt(maxParts[0], 10);
-        var maxM = parseInt(maxParts[1], 10);
-
-        var minDate = new Date(minY, minM - 1, 1);
-        var maxDate = new Date(maxY, maxM - 1, 1);
-
-        var curParts = elMonth.value.split('-');
-        var Y = parseInt(curParts[0], 10);
-        var M = parseInt(curParts[1], 10);
-        var base = new Date(Y, M - 1, 1);
-        base.setMonth(base.getMonth() + n);
-
-        if (base < minDate) {
-          base = minDate;
-        }
-        if (base > maxDate) {
-          base = maxDate;
-        }
-
-        elMonth.value =
-          base.getFullYear() +
-          '-' +
-          String(base.getMonth() + 1).padStart(2, '0');
-      },
-
-      // 目前起始年月（給後台批次用）
-      getStartYM: function () {
-        var parts = elMonth.value.split('-');
-        var Y = parseInt(parts[0], 10);
-        var M = parseInt(parts[1], 10);
-        return [Y, M];
-      },
-
+      reload: reload,
+      render: render,
+      goToday: goToday,
+      shiftMonths: shiftMonths,
       monthDays: monthDays,
       ymd: ymd,
       todayStr: todayStr,
-
-      get cache() {
-        return CACHE;
+      getStartYM: function () {
+        var current = getMonthRange();
+        return [current.y, current.m];
       },
-
-      patch: ADMIN_TOKEN ? apiPatch : null,
-
-      // 只重畫，不重抓（給批次功能用）
-      render: renderCalendars,
+      get cache() {
+        return stateCache;
+      },
+      get holidays() {
+        return holidayCache;
+      },
+      patch: adminToken ? apiPatch : null,
     };
   }
 
