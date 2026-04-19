@@ -70,6 +70,35 @@ const adminCalendar = RoomCalendar.create({
   },
 });
 
+function openMonthPicker(input) {
+  if (!input) return;
+  input.focus({ preventScroll: true });
+  if (typeof input.showPicker === 'function') {
+    try {
+      input.showPicker();
+    } catch (error) {
+      // Ignore unsupported picker invocation.
+    }
+  }
+}
+
+function bindMonthFieldPicker(input) {
+  if (!input) return;
+  const field = input.closest('.field');
+  if (!field) return;
+
+  field.addEventListener('pointerdown', (event) => {
+    if (event.target === input) return;
+    event.preventDefault();
+    openMonthPicker(input);
+  });
+
+  field.addEventListener('click', (event) => {
+    if (event.target === input) return;
+    openMonthPicker(input);
+  });
+}
+
 function syncAdminNavState() {
   if (adminPage.btnPrev) {
     adminPage.btnPrev.disabled = !adminCalendar.canShiftMonths(-3);
@@ -155,6 +184,8 @@ adminPage.btnNext.addEventListener('click', () => {
   syncAdminNavState();
   reloadAdminCalendar();
 });
+
+bindMonthFieldPicker(adminPage.monthInput);
 
 adminPage.monthInput.addEventListener('change', () => {
   syncAdminNavState();
