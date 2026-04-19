@@ -3,10 +3,10 @@
 
   var WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
   var DEFAULT_STATUS_TEXT = {
-    free: '可預約',
-    full: '已客滿',
-    loading: '讀取中',
-    past: '已過去',
+    free: '',
+    full: '客滿',
+    loading: '',
+    past: '',
   };
 
   function createCalendar(options) {
@@ -36,6 +36,7 @@
       typeof options.monthSummaryFormatter === 'function'
         ? options.monthSummaryFormatter
         : defaultMonthSummaryFormatter;
+    var showMonthSummary = options.showMonthSummary !== false;
     var summaryFormatter =
       typeof options.summaryFormatter === 'function'
         ? options.summaryFormatter
@@ -79,27 +80,38 @@
 
     function getMonthRange() {
       var parts = monthInput.value.split('-');
-      var y = parseInt(parts[0], 10);
-      var m = parseInt(parts[1], 10);
-      return { y: y, m: m };
+      return {
+        y: parseInt(parts[0], 10),
+        m: parseInt(parts[1], 10),
+      };
+    }
+
+    function getMinDate() {
+      var parts = monthInput.min.split('-');
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+    }
+
+    function getMaxDate() {
+      var parts = monthInput.max.split('-');
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
     }
 
     function clampMonthInput() {
       var current = getMonthRange();
-      var minParts = monthInput.min.split('-');
-      var maxParts = monthInput.max.split('-');
-      var minY = parseInt(minParts[0], 10);
-      var minM = parseInt(minParts[1], 10);
-      var maxY = parseInt(maxParts[0], 10);
-      var maxM = parseInt(maxParts[1], 10);
+      var minDate = getMinDate();
+      var maxDate = getMaxDate();
+      var currentDate = new Date(current.y, current.m - 1, 1);
 
-      if (current.y < minY || (current.y === minY && current.m < minM)) {
-        monthInput.value = minY + '-' + String(minM).padStart(2, '0');
-      } else if (
-        current.y > maxY ||
-        (current.y === maxY && current.m > maxM)
-      ) {
-        monthInput.value = maxY + '-' + String(maxM).padStart(2, '0');
+      if (currentDate < minDate) {
+        monthInput.value =
+          minDate.getFullYear() +
+          '-' +
+          String(minDate.getMonth() + 1).padStart(2, '0');
+      } else if (currentDate > maxDate) {
+        monthInput.value =
+          maxDate.getFullYear() +
+          '-' +
+          String(maxDate.getMonth() + 1).padStart(2, '0');
       }
     }
 
@@ -112,8 +124,10 @@
         maxDate.getFullYear() +
         '-' +
         String(maxDate.getMonth() + 1).padStart(2, '0');
+
       monthInput.min = minMonth;
       monthInput.max = maxMonth;
+
       if (!monthInput.value) {
         monthInput.value = minMonth;
       }
@@ -140,13 +154,16 @@
       var url = new URL(apiBase);
       url.searchParams.set('year', String(year));
       url.searchParams.set('t', Date.now().toString());
+
       var res = await fetch(url.toString(), {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       });
+
       if (!res.ok) {
         throw new Error('GET failed ' + res.status);
       }
+
       var json = await res.json();
       stateCache[year] = (json && json.status) || {};
       loadedStateYears[year] = true;
@@ -157,6 +174,7 @@
       if (!adminToken) {
         throw new Error('No admin token configured');
       }
+
       var form = new FormData();
       form.append('token', adminToken);
       form.append('year', String(year));
@@ -262,9 +280,7 @@
         String(viewSpanMonths) +
         ' 個月共有 ' +
         String(summary.free) +
-        ' 天可預約，' +
-        String(summary.full) +
-        ' 天已客滿'
+        ' 天可安排'
       );
     }
 
@@ -295,11 +311,13 @@
       return summary;
     }
 
-    function createStateNode(status, dateStr, isPast, isLoading) {
+    function createStateNode(status, isPast, isLoading) {
       var node;
+
       if (isLoading) {
         node = document.createElement('span');
         node.className = 'state-badge loading';
+        node.setAttribute('aria-label', '讀取中');
         node.textContent = statusText.loading;
         return node;
       }
@@ -307,6 +325,7 @@
       if (isPast) {
         node = document.createElement('span');
         node.className = 'state-badge past';
+        node.setAttribute('aria-label', '已過去');
         node.textContent = statusText.past;
         return node;
       }
@@ -319,7 +338,8 @@
       }
 
       node.className = 'state-badge ' + (status === 'full' ? 'full' : 'free');
-      node.textContent = statusText[status] || status;
+      node.setAttribute('aria-label', status === 'full' ? '已客滿' : '可預約');
+      node.textContent = statusText[status] || '';
       return node;
     }
 
@@ -337,7 +357,7 @@
       var dateEl = document.createElement('span');
       var holidayEl = document.createElement('span');
       var todayBadge = document.createElement('span');
-      var stateEl = createStateNode(status, dateStr, isPast, !isLoaded);
+      var stateEl = createStateNode(status, isPast, !isLoaded);
 
       cell.className =
         'calendar-day' +
@@ -361,7 +381,7 @@
 
       if (isToday) {
         todayBadge.className = 'today-badge';
-        todayBadge.textContent = '今天';
+        todayBadge.setAttribute('aria-hidden', 'true');
         cell.appendChild(todayBadge);
       }
 
@@ -441,7 +461,12 @@
         title.className = 'calendar-title';
         counts.className = 'month-counts';
         title.textContent = month.y + ' 年 ' + month.m + ' 月';
-        counts.textContent = monthSummaryFormatter(getMonthSummary(month.y, month.m));
+        counts.textContent = showMonthSummary
+          ? monthSummaryFormatter(getMonthSummary(month.y, month.m))
+          : '';
+        if (!showMonthSummary) {
+          counts.style.display = 'none';
+        }
         header.appendChild(title);
         header.appendChild(counts);
         wrapper.appendChild(header);
@@ -482,6 +507,18 @@
           tbody.appendChild(row);
         }
 
+        while (tbody.children.length < 6) {
+          var extraRow = document.createElement('tr');
+          for (var emptyIndex = 0; emptyIndex < 7; emptyIndex += 1) {
+            var extraTd = document.createElement('td');
+            var extraCell = document.createElement('div');
+            extraCell.className = 'calendar-day empty';
+            extraTd.appendChild(extraCell);
+            extraRow.appendChild(extraTd);
+          }
+          tbody.appendChild(extraRow);
+        }
+
         table.appendChild(tbody);
         wrapper.appendChild(table);
         calendarsContainer.appendChild(wrapper);
@@ -494,10 +531,14 @@
       updateSyncText('正在同步資料...');
       await ensureYearsLoaded();
       render();
-      updateSyncText('已於 ' + new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }) + ' 更新');
+      updateSyncText(
+        '已於 ' +
+          new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }) +
+          ' 更新'
+      );
     }
 
     function goToday() {
@@ -519,6 +560,12 @@
       clampMonthInput();
     }
 
+    function canShiftMonths(delta) {
+      var current = getMonthRange();
+      var target = new Date(current.y, current.m - 1 + delta, 1);
+      return target >= getMinDate() && target <= getMaxDate();
+    }
+
     initSelectors();
 
     return {
@@ -526,6 +573,7 @@
       render: render,
       goToday: goToday,
       shiftMonths: shiftMonths,
+      canShiftMonths: canShiftMonths,
       monthDays: monthDays,
       ymd: ymd,
       todayStr: todayStr,

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>逸豆夢房況管理台</title>
+  <title>一斗夢房況管理台</title>
   <meta name="robots" content="noindex,nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,10 +13,10 @@
   />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body class="theme-admin">
   <main class="page-shell">
     <section class="hero">
-      <span class="hero-tag">逸豆夢後台管理</span>
+      <span class="hero-tag">一斗夢後台管理</span>
       <div class="hero-grid">
         <div>
           <h1 class="hero-title">更輕鬆地調整房況，讓檔期維護更直覺。</h1>
@@ -26,19 +26,19 @@
           </p>
         </div>
         <aside class="stats-card" aria-label="後台摘要">
-          <p class="stats-title">管理摘要</p>
+          <p class="stats-title">管理方式</p>
           <div class="stats-grid">
             <div class="stat-chip">
               <strong>單格切換</strong>
               <span>直接點日期就能改狀態</span>
             </div>
             <div class="stat-chip">
-              <strong id="summaryText">正在載入中...</strong>
-              <span>快速掌握未來三個月總覽</span>
+              <strong>批次操作</strong>
+              <span>快速處理整月常見設定</span>
             </div>
             <div class="stat-chip">
-              <strong>批次工具</strong>
-              <span>一鍵處理本月常見設定</span>
+              <strong>即時同步</strong>
+              <span>調整後立即寫回 GAS</span>
             </div>
           </div>
         </aside>
@@ -72,8 +72,8 @@
     </section>
 
     <section class="legend" aria-label="狀態說明">
-      <span class="legend-item"><span class="legend-dot ok"></span>可預約</span>
-      <span class="legend-item"><span class="legend-dot bad"></span>已客滿</span>
+      <span class="legend-item"><span class="legend-dot ok"></span>綠色可預約</span>
+      <span class="legend-item"><span class="legend-dot bad"></span>紅色已客滿</span>
       <span class="legend-item"><span class="legend-dot today"></span>今天</span>
       <span class="legend-item"><span class="legend-dot weekend"></span>週末底色</span>
       <span class="legend-item">點擊未來日期即可直接切換狀態</span>

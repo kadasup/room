@@ -4,12 +4,11 @@ const API_BASE_PUBLIC =
 const holidayAliases = [
   ['中華民國開國紀念日', '元旦'],
   ['和平紀念日', '228'],
-  ['兒童節及民族掃墓節', '兒童節/清明'],
+  ['兒童節及民族掃墓節', '兒童/清明'],
   ['民族掃墓節', '清明'],
-  ['勞動節', '勞動節'],
+  ['勞動節', '勞動'],
   ['端午節', '端午'],
   ['中秋節', '中秋'],
-  ['國慶日', '雙十'],
   ['農曆除夕', '除夕'],
   ['春節', '春節'],
 ];
@@ -43,7 +42,6 @@ const publicPage = {
   monthInput: document.getElementById('startMonth'),
   calendars: document.getElementById('calendars'),
   lastSync: document.getElementById('lastSync'),
-  summary: document.getElementById('summaryText'),
   btnPrev: document.getElementById('btnPrev3'),
   btnNext: document.getElementById('btnNext3'),
   btnReload: document.getElementById('btnReload'),
@@ -55,11 +53,20 @@ const publicCalendar = RoomCalendar.create({
   monthInput: publicPage.monthInput,
   calendarsContainer: publicPage.calendars,
   lastSyncEl: publicPage.lastSync,
-  summaryEl: publicPage.summary,
   viewSpanMonths: 3,
+  showMonthSummary: false,
   contactPhone: document.body.dataset.phone || '0905385388',
   holidayLoader: loadTaiwanHolidays,
 });
+
+function syncPublicNavState() {
+  if (publicPage.btnPrev) {
+    publicPage.btnPrev.disabled = !publicCalendar.canShiftMonths(-3);
+  }
+  if (publicPage.btnNext) {
+    publicPage.btnNext.disabled = !publicCalendar.canShiftMonths(3);
+  }
+}
 
 async function reloadPublicCalendar({ goToday = false } = {}) {
   const btn = publicPage.btnReload;
@@ -72,6 +79,7 @@ async function reloadPublicCalendar({ goToday = false } = {}) {
     if (goToday) {
       publicCalendar.goToday();
     }
+    syncPublicNavState();
     await publicCalendar.reload();
   } catch (error) {
     console.error(error);
@@ -84,6 +92,7 @@ async function reloadPublicCalendar({ goToday = false } = {}) {
       btn.disabled = false;
       btn.textContent = '回到本月';
     }
+    syncPublicNavState();
   }
 }
 
@@ -92,13 +101,18 @@ publicPage.btnReload.addEventListener('click', () =>
 );
 publicPage.btnPrev.addEventListener('click', () => {
   publicCalendar.shiftMonths(-3);
+  syncPublicNavState();
   reloadPublicCalendar();
 });
 publicPage.btnNext.addEventListener('click', () => {
   publicCalendar.shiftMonths(3);
+  syncPublicNavState();
   reloadPublicCalendar();
 });
-publicPage.monthInput.addEventListener('change', () => reloadPublicCalendar());
+publicPage.monthInput.addEventListener('change', () => {
+  syncPublicNavState();
+  reloadPublicCalendar();
+});
 
 window.addEventListener('scroll', () => {
   if (!publicPage.btnTop) return;

@@ -23,7 +23,6 @@ const adminPage = {
   monthInput: document.getElementById('startMonth'),
   calendars: document.getElementById('calendars'),
   lastSync: document.getElementById('lastSync'),
-  summary: document.getElementById('summaryText'),
   btnPrev: document.getElementById('btnPrev3'),
   btnNext: document.getElementById('btnNext3'),
   btnReload: document.getElementById('btnReload'),
@@ -37,10 +36,19 @@ const adminCalendar = RoomCalendar.create({
   monthInput: adminPage.monthInput,
   calendarsContainer: adminPage.calendars,
   lastSyncEl: adminPage.lastSync,
-  summaryEl: adminPage.summary,
   viewSpanMonths: 3,
+  showMonthSummary: false,
   holidayLoader: loadTaiwanHolidaysForAdmin,
 });
+
+function syncAdminNavState() {
+  if (adminPage.btnPrev) {
+    adminPage.btnPrev.disabled = !adminCalendar.canShiftMonths(-3);
+  }
+  if (adminPage.btnNext) {
+    adminPage.btnNext.disabled = !adminCalendar.canShiftMonths(3);
+  }
+}
 
 async function reloadAdminCalendar({ goToday = false } = {}) {
   try {
@@ -49,6 +57,7 @@ async function reloadAdminCalendar({ goToday = false } = {}) {
     if (goToday) {
       adminCalendar.goToday();
     }
+    syncAdminNavState();
     await adminCalendar.reload();
   } catch (error) {
     console.error(error);
@@ -57,6 +66,7 @@ async function reloadAdminCalendar({ goToday = false } = {}) {
   } finally {
     adminPage.btnReload.disabled = false;
     adminPage.btnReload.textContent = '同步最新';
+    syncAdminNavState();
   }
 }
 
@@ -71,6 +81,7 @@ async function patchMonth(delta, successText) {
     await adminCalendar.patch(year, delta);
     adminPage.lastSync.textContent = successText;
     await adminCalendar.reload();
+    syncAdminNavState();
   } catch (error) {
     console.error(error);
     alert('批次更新失敗，畫面將重新整理。');
@@ -83,13 +94,18 @@ adminPage.btnReload.addEventListener('click', () =>
 );
 adminPage.btnPrev.addEventListener('click', () => {
   adminCalendar.shiftMonths(-3);
+  syncAdminNavState();
   reloadAdminCalendar();
 });
 adminPage.btnNext.addEventListener('click', () => {
   adminCalendar.shiftMonths(3);
+  syncAdminNavState();
   reloadAdminCalendar();
 });
-adminPage.monthInput.addEventListener('change', () => reloadAdminCalendar());
+adminPage.monthInput.addEventListener('change', () => {
+  syncAdminNavState();
+  reloadAdminCalendar();
+});
 
 adminPage.btnSetSatFull.addEventListener('click', async () => {
   const [year, month] = adminCalendar.getStartYM();
