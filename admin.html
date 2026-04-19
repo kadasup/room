@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>一斗夢房況管理台</title>
+  <title>一斗夢後台 | 房況管理</title>
   <meta name="robots" content="noindex,nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,26 +19,26 @@
       <span class="hero-tag">一斗夢後台管理</span>
       <div class="hero-grid">
         <div>
-          <h1 class="hero-title">更輕鬆地調整房況，讓檔期維護更直覺。</h1>
+          <h1 class="hero-title">快速維護未來三個月房況，更新後前台會自動同步。</h1>
           <p class="hero-copy">
-            點擊日期就能切換可預約與客滿，並支援整月快速操作。介面與公開頁共用同一套月曆邏輯，
-            減少重複維護，也讓桌機與手機操作都更穩定。
+            點選未來日期即可在可安排與客滿之間切換，也能使用批次按鈕快速設定。
+            目前後台會主動通知同瀏覽器前台刷新，其他裝置則由前台定時靜默同步。
           </p>
         </div>
-        <aside class="stats-card" aria-label="後台摘要">
-          <p class="stats-title">管理方式</p>
+        <aside class="stats-card" aria-label="管理重點">
+          <p class="stats-title">這版後台優化</p>
           <div class="stats-grid">
             <div class="stat-chip">
               <strong>單格切換</strong>
-              <span>直接點日期就能改狀態</span>
+              <span>點日期即可切換狀態，失敗會自動回滾。</span>
             </div>
             <div class="stat-chip">
-              <strong>批次操作</strong>
-              <span>快速處理整月常見設定</span>
+              <strong>批次更新</strong>
+              <span>一鍵把本月星期六客滿，或一鍵恢復可安排。</span>
             </div>
             <div class="stat-chip">
-              <strong>即時同步</strong>
-              <span>調整後立即寫回 GAS</span>
+              <strong>同步通知</strong>
+              <span>更新成功後會通知前台頁面重新抓取最新狀態。</span>
             </div>
           </div>
         </aside>
@@ -54,7 +54,7 @@
         往前 3 個月
       </button>
       <button id="btnReload" class="button button-primary month-action" type="button">
-        同步最新
+        回到本月
       </button>
       <button id="btnNext3" class="button button-secondary month-action" type="button">
         往後 3 個月
@@ -62,29 +62,29 @@
       <div id="lastSync" class="status-chip" aria-live="polite">等待同步</div>
     </section>
 
-    <section class="admin-panel" aria-label="批次操作">
+    <section class="admin-panel" aria-label="批次工具">
       <button id="btnSetSatFull" class="button button-secondary" type="button">
-        本月未來星期六設為客滿
+        本月星期六設為客滿
       </button>
       <button id="btnSetAllFree" class="button button-ghost" type="button">
-        本月未來日期全部改為可預約
+        本月未來日期全部恢復可安排
       </button>
     </section>
 
     <section class="legend" aria-label="狀態說明">
-      <span class="legend-item"><span class="legend-dot ok"></span>綠色可預約</span>
-      <span class="legend-item"><span class="legend-dot bad"></span>紅色已客滿</span>
+      <span class="legend-item"><span class="legend-dot ok"></span>綠色代表可安排</span>
+      <span class="legend-item"><span class="legend-dot bad"></span>紅色代表客滿</span>
       <span class="legend-item"><span class="legend-dot today"></span>今天</span>
       <span class="legend-item"><span class="legend-dot weekend"></span>週末底色</span>
-      <span class="legend-item">點擊未來日期即可直接切換狀態</span>
+      <span class="legend-item">點選未來日期即可切換狀態</span>
     </section>
 
-    <div id="calendars" class="calendar-grid" aria-label="房況管理月曆"></div>
+    <div id="calendars" class="calendar-grid" aria-label="三個月月曆"></div>
 
-    <section class="admin-note">
-      <strong>管理提醒：</strong>
-      這個頁面仍然是前端帶著 token 呼叫 GAS，方便但安全性有限。若之後要正式長期使用，
-      建議把 token 與管理權限移到更安全的驗證流程。
+    <section class="info-banner">
+      <strong>提醒：</strong>
+      後台 token 目前仍在前端程式中，適合小型內部使用。若後續要正式公開多人使用，
+      建議改成真正的登入驗證流程，避免 token 外流。
     </section>
   </main>
 

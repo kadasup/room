@@ -8,6 +8,145 @@
     loading: '',
     past: '',
   };
+  var HOLIDAY_SOURCE =
+    'https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/';
+
+  function pad2(value) {
+    return String(value).padStart(2, '0');
+  }
+
+  function formatDate(date) {
+    return (
+      date.getFullYear() +
+      '-' +
+      pad2(date.getMonth() + 1) +
+      '-' +
+      pad2(date.getDate())
+    );
+  }
+
+  function monthKeyFromDate(date) {
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1);
+  }
+
+  function monthStart(year, month) {
+    return new Date(year, month - 1, 1);
+  }
+
+  function addMonths(year, month, delta) {
+    var date = new Date(year, month - 1 + delta, 1);
+    return { year: date.getFullYear(), month: date.getMonth() + 1 };
+  }
+
+  function parseMonthValue(value) {
+    var parts = String(value || '').split('-');
+    return {
+      year: parseInt(parts[0], 10),
+      month: parseInt(parts[1], 10),
+    };
+  }
+
+  function isValidMonth(monthValue) {
+    return (
+      monthValue &&
+      Number.isFinite(monthValue.year) &&
+      Number.isFinite(monthValue.month) &&
+      monthValue.month >= 1 &&
+      monthValue.month <= 12
+    );
+  }
+
+  function updateElementText(node, value) {
+    if (node) {
+      node.textContent = value;
+    }
+  }
+
+  function defaultSummaryFormatter(summary, viewSpanMonths) {
+    return (
+      '未來 ' +
+      String(viewSpanMonths) +
+      ' 個月共 ' +
+      String(summary.free) +
+      ' 天可安排，' +
+      String(summary.full) +
+      ' 天客滿'
+    );
+  }
+
+  function defaultMonthSummaryFormatter(summary) {
+    return (
+      '可安排 ' +
+      String(summary.free).padStart(2, '0') +
+      ' 天 / 客滿 ' +
+      String(summary.full).padStart(2, '0') +
+      ' 天'
+    );
+  }
+
+  function createHolidayLoader(options) {
+    var settings = options || {};
+    var cachePrefix = settings.cachePrefix || 'room-holidays-';
+    var normalize =
+      typeof settings.normalize === 'function' ? settings.normalize : null;
+
+    function getCachedYear(year) {
+      try {
+        var raw = localStorage.getItem(cachePrefix + String(year));
+        if (!raw) return null;
+        var parsed = JSON.parse(raw);
+        return parsed && parsed.data ? parsed.data : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function setCachedYear(year, data) {
+      try {
+        localStorage.setItem(
+          cachePrefix + String(year),
+          JSON.stringify({
+            cachedAt: Date.now(),
+            data: data,
+          })
+        );
+      } catch (error) {
+        // Ignore storage failures.
+      }
+    }
+
+    return async function loadTaiwanHolidays(year) {
+      var cached = getCachedYear(year);
+      if (cached) {
+        return cached;
+      }
+
+      var response = await fetch(HOLIDAY_SOURCE + String(year) + '.json');
+      if (!response.ok) {
+        throw new Error('holiday fetch failed: ' + response.status);
+      }
+
+      var list = await response.json();
+      var map = {};
+      list.forEach(function (item) {
+        if (!item.isHoliday || !item.description) {
+          return;
+        }
+
+        var dateValue = String(item.date || '');
+        var dateStr =
+          dateValue.slice(0, 4) +
+          '-' +
+          dateValue.slice(4, 6) +
+          '-' +
+          dateValue.slice(6, 8);
+        map[dateStr] = normalize ? normalize(item.description) : item.description;
+      });
+
+      setCachedYear(year, map);
+      return map;
+    };
+  }
 
   function createCalendar(options) {
     if (!options || !options.apiBase) {
@@ -20,157 +159,182 @@
     }
 
     var apiBase = options.apiBase;
-    var adminToken = options.adminToken || null;
+    var adminToken = options.adminToken || '';
     var monthInput = options.monthInput;
     var calendarsContainer = options.calendarsContainer;
     var lastSyncEl = options.lastSyncEl || null;
     var summaryEl = options.summaryEl || null;
     var viewSpanMonths = options.viewSpanMonths || 3;
-    var contactPhone = options.contactPhone || '';
-    var statusText = Object.assign({}, DEFAULT_STATUS_TEXT, options.statusText);
-    var onCellAction =
-      typeof options.onCellAction === 'function' ? options.onCellAction : null;
+    var holidayLoader =
+      typeof options.holidayLoader === 'function' ? options.holidayLoader : null;
     var onStateUpdated =
       typeof options.onStateUpdated === 'function' ? options.onStateUpdated : null;
+    var onRenderComplete =
+      typeof options.onRenderComplete === 'function'
+        ? options.onRenderComplete
+        : null;
     var monthSummaryFormatter =
       typeof options.monthSummaryFormatter === 'function'
         ? options.monthSummaryFormatter
         : defaultMonthSummaryFormatter;
-    var showMonthSummary = options.showMonthSummary !== false;
     var summaryFormatter =
       typeof options.summaryFormatter === 'function'
         ? options.summaryFormatter
         : defaultSummaryFormatter;
-    var holidayLoader =
-      typeof options.holidayLoader === 'function' ? options.holidayLoader : null;
+    var showMonthSummary = options.showMonthSummary !== false;
+    var statusText = Object.assign({}, DEFAULT_STATUS_TEXT, options.statusText);
 
+    var isAdmin = Boolean(adminToken);
     var stateCache = {};
     var holidayCache = {};
     var loadedStateYears = {};
     var loadedHolidayYears = {};
-    var todayStr = fmtDate(new Date());
+    var loadingYears = {};
+    var todayStr = formatDate(new Date());
 
-    function fmtDate(date) {
-      return date.toISOString().slice(0, 10);
+    function ymd(year, month, day) {
+      return year + '-' + pad2(month) + '-' + pad2(day);
     }
 
-    function ymd(y, m, day) {
-      return (
-        y +
-        '-' +
-        String(m).padStart(2, '0') +
-        '-' +
-        String(day).padStart(2, '0')
-      );
-    }
-
-    function monthDays(y, m) {
-      var last = new Date(y, m, 0).getDate();
+    function monthDays(year, month) {
+      var last = new Date(year, month, 0).getDate();
       var out = [];
-      for (var day = 1; day <= last; day += 1) {
+      var day;
+      for (day = 1; day <= last; day += 1) {
         out.push(day);
       }
       return out;
     }
 
-    function isWeekend(y, m, day) {
-      var weekday = new Date(y, m - 1, day).getDay();
-      return weekday === 0 || weekday === 6;
+    function getStartYM() {
+      return parseMonthValue(monthInput.value);
     }
 
-    function getMonthRange() {
-      var parts = monthInput.value.split('-');
-      return {
-        y: parseInt(parts[0], 10),
-        m: parseInt(parts[1], 10),
-      };
+    function getBoundDate(value) {
+      var monthValue = parseMonthValue(value);
+      return monthStart(monthValue.year, monthValue.month);
     }
 
-    function getMinDate() {
-      var parts = monthInput.min.split('-');
-      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
-    }
+    function ensureMonthRange() {
+      var now = new Date();
+      var maxStartOffset = Math.max(0, 24 - viewSpanMonths);
+      var minValue = monthKeyFromDate(new Date(now.getFullYear(), now.getMonth(), 1));
+      var maxValue = monthKeyFromDate(
+        new Date(now.getFullYear(), now.getMonth() + maxStartOffset, 1)
+      );
 
-    function getMaxDate() {
-      var parts = monthInput.max.split('-');
-      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+      monthInput.min = minValue;
+      monthInput.max = maxValue;
+
+      if (!monthInput.value) {
+        monthInput.value = minValue;
+      }
+
+      clampMonthInput();
     }
 
     function clampMonthInput() {
-      var current = getMonthRange();
-      var minDate = getMinDate();
-      var maxDate = getMaxDate();
-      var currentDate = new Date(current.y, current.m - 1, 1);
+      var current = getStartYM();
+      if (!isValidMonth(current)) {
+        monthInput.value = monthInput.min;
+        return;
+      }
+
+      var currentDate = monthStart(current.year, current.month);
+      var minDate = getBoundDate(monthInput.min);
+      var maxDate = getBoundDate(monthInput.max);
 
       if (currentDate < minDate) {
-        monthInput.value =
-          minDate.getFullYear() +
-          '-' +
-          String(minDate.getMonth() + 1).padStart(2, '0');
+        monthInput.value = monthInput.min;
       } else if (currentDate > maxDate) {
-        monthInput.value =
-          maxDate.getFullYear() +
-          '-' +
-          String(maxDate.getMonth() + 1).padStart(2, '0');
+        monthInput.value = monthInput.max;
       }
-    }
-
-    function initSelectors() {
-      var now = new Date();
-      var minMonth =
-        now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-      var maxDate = new Date(now.getFullYear(), now.getMonth() + 23, 1);
-      var maxMonth =
-        maxDate.getFullYear() +
-        '-' +
-        String(maxDate.getMonth() + 1).padStart(2, '0');
-
-      monthInput.min = minMonth;
-      monthInput.max = maxMonth;
-
-      if (!monthInput.value) {
-        monthInput.value = minMonth;
-      }
-      clampMonthInput();
     }
 
     function getVisibleMonths() {
-      clampMonthInput();
-      var start = getMonthRange();
-      var out = [];
+      var start = getStartYM();
+      var months = [];
+      var index;
 
-      for (var index = 0; index < viewSpanMonths; index += 1) {
-        var date = new Date(start.y, start.m - 1 + index, 1);
-        out.push({
-          y: date.getFullYear(),
-          m: date.getMonth() + 1,
-        });
+      clampMonthInput();
+      for (index = 0; index < viewSpanMonths; index += 1) {
+        months.push(addMonths(start.year, start.month, index));
       }
 
-      return out;
+      return months;
+    }
+
+    function formatUpdatedAt(value) {
+      if (!value) {
+        return '同步完成';
+      }
+
+      var date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return '同步完成';
+      }
+
+      return (
+        '更新於 ' +
+        String(date.getMonth() + 1) +
+        '/' +
+        String(date.getDate()) +
+        ' ' +
+        pad2(date.getHours()) +
+        ':' +
+        pad2(date.getMinutes())
+      );
+    }
+
+    function canShiftMonths(delta) {
+      var start = getStartYM();
+      var target = addMonths(start.year, start.month, delta);
+      var targetDate = monthStart(target.year, target.month);
+      var minDate = getBoundDate(monthInput.min);
+      var maxDate = getBoundDate(monthInput.max);
+      return targetDate >= minDate && targetDate <= maxDate;
+    }
+
+    function shiftMonths(delta) {
+      if (!canShiftMonths(delta)) {
+        return false;
+      }
+      var start = getStartYM();
+      var target = addMonths(start.year, start.month, delta);
+      monthInput.value = target.year + '-' + pad2(target.month);
+      return true;
+    }
+
+    function goToday() {
+      monthInput.value = monthInput.min;
     }
 
     async function apiGet(year) {
       var url = new URL(apiBase);
       url.searchParams.set('year', String(year));
-      url.searchParams.set('t', Date.now().toString());
+      url.searchParams.set('t', String(Date.now()));
 
-      var res = await fetch(url.toString(), {
+      var response = await fetch(url.toString(), {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       });
 
-      if (!res.ok) {
-        throw new Error('GET failed ' + res.status);
+      if (!response.ok) {
+        throw new Error('GET failed ' + response.status);
       }
 
-      var json = await res.json();
-      stateCache[year] = (json && json.status) || {};
+      var payload = await response.json();
+      if (!payload || payload.ok === false) {
+        throw new Error((payload && payload.error) || 'GET failed');
+      }
+
+      stateCache[year] = payload.status || {};
       loadedStateYears[year] = true;
-      return json;
+      updateElementText(lastSyncEl, formatUpdatedAt(payload.updatedAt));
+      return payload;
     }
 
-    async function apiPatch(year, delta) {
+    async function patch(year, delta) {
       if (!adminToken) {
         throw new Error('No admin token configured');
       }
@@ -180,53 +344,80 @@
       form.append('year', String(year));
       form.append('delta', JSON.stringify(delta));
 
-      var res = await fetch(apiBase, {
+      var response = await fetch(apiBase, {
         method: 'POST',
         body: form,
         redirect: 'follow',
       });
 
-      if (!res.ok) {
-        throw new Error('POST failed ' + res.status);
+      if (!response.ok) {
+        throw new Error('POST failed ' + response.status);
       }
 
-      var json = await res.json();
-      if (json && json.data && json.data.status) {
-        stateCache[year] = json.data.status;
+      var payload = await response.json();
+      if (!payload || payload.ok === false) {
+        throw new Error((payload && payload.error) || 'POST failed');
       }
-      return json;
+
+      if (payload.data && payload.data.status) {
+        stateCache[year] = payload.data.status;
+      } else {
+        stateCache[year] = stateCache[year] || {};
+        Object.keys(delta).forEach(function (dateStr) {
+          stateCache[year][dateStr] = delta[dateStr];
+        });
+      }
+
+      loadedStateYears[year] = true;
+      updateElementText(lastSyncEl, formatUpdatedAt(payload.updatedAt));
+      return payload;
     }
 
-    async function ensureMetaLoaded(year) {
-      if (!holidayLoader || loadedHolidayYears[year]) {
+    async function ensureHolidayYear(year) {
+      if (!holidayLoader || loadedHolidayYears[year] || loadingYears['h' + year]) {
         return;
       }
-      holidayCache[year] = await holidayLoader(year);
-      loadedHolidayYears[year] = true;
+
+      loadingYears['h' + year] = true;
+      try {
+        holidayCache[year] = await holidayLoader(year);
+        loadedHolidayYears[year] = true;
+      } finally {
+        delete loadingYears['h' + year];
+      }
     }
 
-    async function ensureYearsLoaded() {
+    async function ensureStateYear(year) {
+      if (loadedStateYears[year] || loadingYears['s' + year]) {
+        return;
+      }
+
+      loadingYears['s' + year] = true;
+      try {
+        await apiGet(year);
+      } finally {
+        delete loadingYears['s' + year];
+      }
+    }
+
+    async function ensureVisibleData() {
       var months = getVisibleMonths();
       var uniqueYears = {};
       var requests = [];
 
       months.forEach(function (month) {
-        uniqueYears[month.y] = true;
+        uniqueYears[month.year] = true;
       });
 
       Object.keys(uniqueYears).forEach(function (yearKey) {
         var year = parseInt(yearKey, 10);
-        if (!loadedStateYears[year]) {
-          requests.push(apiGet(year));
-        }
-        if (holidayLoader && !loadedHolidayYears[year]) {
-          requests.push(ensureMetaLoaded(year));
+        requests.push(ensureStateYear(year));
+        if (holidayLoader) {
+          requests.push(ensureHolidayYear(year));
         }
       });
 
-      if (requests.length) {
-        await Promise.all(requests);
-      }
+      await Promise.all(requests);
     }
 
     function getHolidayName(dateStr) {
@@ -236,30 +427,23 @@
         : '';
     }
 
-    function updateSyncText(text) {
-      if (lastSyncEl) {
-        lastSyncEl.textContent = text;
-      }
+    function getStatusForDate(dateStr) {
+      var year = parseInt(dateStr.slice(0, 4), 10);
+      return (stateCache[year] && stateCache[year][dateStr]) || 'free';
     }
 
     function summarizeVisibleMonths() {
-      var months = getVisibleMonths();
-      var summary = {
-        free: 0,
-        full: 0,
-        totalVisible: 0,
-      };
+      var summary = { free: 0, full: 0, totalVisible: 0 };
 
-      months.forEach(function (month) {
-        monthDays(month.y, month.m).forEach(function (day) {
-          var dateStr = ymd(month.y, month.m, day);
+      getVisibleMonths().forEach(function (month) {
+        monthDays(month.year, month.month).forEach(function (day) {
+          var dateStr = ymd(month.year, month.month, day);
           if (dateStr < todayStr) {
             return;
           }
-          var status =
-            (stateCache[month.y] && stateCache[month.y][dateStr]) || 'free';
+
           summary.totalVisible += 1;
-          if (status === 'full') {
+          if (getStatusForDate(dateStr) === 'full') {
             summary.full += 1;
           } else {
             summary.free += 1;
@@ -268,41 +452,21 @@
       });
 
       if (summaryEl) {
-        summaryEl.textContent = summaryFormatter(summary);
+        updateElementText(summaryEl, summaryFormatter(summary, viewSpanMonths));
       }
 
       return summary;
     }
 
-    function defaultSummaryFormatter(summary) {
-      return (
-        '接下來 ' +
-        String(viewSpanMonths) +
-        ' 個月共有 ' +
-        String(summary.free) +
-        ' 天可安排'
-      );
-    }
-
-    function defaultMonthSummaryFormatter(summary) {
-      return (
-        '可預約 ' +
-        String(summary.free).padStart(2, '0') +
-        ' 天 / 已客滿 ' +
-        String(summary.full).padStart(2, '0') +
-        ' 天'
-      );
-    }
-
-    function getMonthSummary(y, m) {
+    function getMonthSummary(year, month) {
       var summary = { free: 0, full: 0 };
-      monthDays(y, m).forEach(function (day) {
-        var dateStr = ymd(y, m, day);
+      monthDays(year, month).forEach(function (day) {
+        var dateStr = ymd(year, month, day);
         if (dateStr < todayStr) {
           return;
         }
-        var status = (stateCache[y] && stateCache[y][dateStr]) || 'free';
-        if (status === 'full') {
+
+        if (getStatusForDate(dateStr) === 'full') {
           summary.full += 1;
         } else {
           summary.free += 1;
@@ -311,285 +475,234 @@
       return summary;
     }
 
-    function createStateNode(status, isPast, isLoading) {
-      var node;
-
-      if (isLoading) {
-        node = document.createElement('span');
-        node.className = 'state-badge loading';
-        node.setAttribute('aria-label', '讀取中');
-        node.textContent = statusText.loading;
-        return node;
-      }
-
-      if (isPast) {
-        node = document.createElement('span');
-        node.className = 'state-badge past';
-        node.setAttribute('aria-label', '已過去');
-        node.textContent = statusText.past;
-        return node;
-      }
-
-      if (status === 'free' && contactPhone) {
-        node = document.createElement('a');
-        node.href = 'tel:' + contactPhone;
-      } else {
-        node = document.createElement('span');
-      }
-
-      node.className = 'state-badge ' + (status === 'full' ? 'full' : 'free');
-      node.setAttribute('aria-label', status === 'full' ? '已客滿' : '可預約');
-      node.textContent = statusText[status] || '';
+    function createStateNode(status, isPast) {
+      var node = document.createElement('span');
+      var resolvedStatus = isPast ? 'past' : status;
+      node.className = 'state-badge ' + resolvedStatus;
+      node.textContent = statusText[resolvedStatus] || '';
+      node.setAttribute('aria-label', statusText[resolvedStatus] || '');
       return node;
     }
 
-    function buildDayCell(y, m, day) {
-      var dateStr = ymd(y, m, day);
+    function buildDayCell(year, month, day, firstWeekday, dateStr) {
+      var td = document.createElement('td');
+      var dayEl = document.createElement('div');
+      var header = document.createElement('div');
+      var dateNumber = document.createElement('span');
+      var holidayLabel = document.createElement('span');
+      var stateNode;
       var holidayName = getHolidayName(dateStr);
       var isPast = dateStr < todayStr;
       var isToday = dateStr === todayStr;
-      var isLoaded = Boolean(loadedStateYears[y]);
-      var status = (stateCache[y] && stateCache[y][dateStr]) || 'free';
+      var isWeekend =
+        new Date(year, month - 1, day).getDay() === 0 ||
+        new Date(year, month - 1, day).getDay() === 6;
+      var status = getStatusForDate(dateStr);
 
-      var td = document.createElement('td');
-      var cell = document.createElement('div');
-      var header = document.createElement('div');
-      var dateEl = document.createElement('span');
-      var holidayEl = document.createElement('span');
-      var todayBadge = document.createElement('span');
-      var stateEl = createStateNode(status, isPast, !isLoaded);
-
-      cell.className =
-        'calendar-day' +
-        (isWeekend(y, m, day) ? ' weekend' : '') +
-        (isToday ? ' today' : '') +
-        (isPast ? ' past' : '') +
-        (adminToken && !isPast ? ' is-admin' : '');
+      td.dataset.date = dateStr;
+      dayEl.className = 'calendar-day';
+      if (isWeekend) dayEl.classList.add('weekend');
+      if (isToday) dayEl.classList.add('today');
+      if (isPast) dayEl.classList.add('past');
+      if (isAdmin && !isPast) dayEl.classList.add('is-admin');
 
       header.className = 'calendar-day-header';
-      dateEl.className = 'date-number';
-      dateEl.textContent = String(day);
-      header.appendChild(dateEl);
 
-      if (holidayName) {
-        holidayEl.className = 'holiday-label';
-        holidayEl.textContent = holidayName;
-        header.appendChild(holidayEl);
-      }
+      dateNumber.className = 'date-number';
+      dateNumber.textContent = String(day);
+      header.appendChild(dateNumber);
 
-      cell.appendChild(header);
+      holidayLabel.className = 'holiday-label';
+      holidayLabel.textContent = holidayName || '';
+      header.appendChild(holidayLabel);
+      dayEl.appendChild(header);
 
       if (isToday) {
+        var todayBadge = document.createElement('span');
         todayBadge.className = 'today-badge';
-        todayBadge.setAttribute('aria-hidden', 'true');
-        cell.appendChild(todayBadge);
+        todayBadge.setAttribute('aria-label', '今天');
+        dayEl.appendChild(todayBadge);
       }
 
-      cell.appendChild(stateEl);
-      td.appendChild(cell);
+      stateNode = createStateNode(status, isPast);
+      dayEl.appendChild(stateNode);
 
-      if (adminToken && !isPast) {
-        td.addEventListener('click', async function () {
-          var current = (stateCache[y] && stateCache[y][dateStr]) || 'free';
-          var next = current === 'full' ? 'free' : 'full';
-          stateCache[y] = stateCache[y] || {};
-          stateCache[y][dateStr] = next;
-          render();
-
-          try {
-            await apiPatch(y, (function () {
-              var delta = {};
-              delta[dateStr] = next;
-              return delta;
-            })());
-            updateSyncText('已於 ' + new Date().toLocaleString() + ' 同步');
-            if (onStateUpdated) {
-              onStateUpdated({
-                y: y,
-                m: m,
-                day: day,
-                dateStr: dateStr,
-                state: next,
-              });
-            }
-          } catch (error) {
-            stateCache[y][dateStr] = current;
-            render();
-            updateSyncText('同步失敗');
-            alert(
-              '更新失敗，已還原原本狀態。' +
-                (error && error.message ? ' ' + error.message : '')
-            );
-          }
-        });
-      } else if (onCellAction) {
-        onCellAction({
-          y: y,
-          m: m,
-          day: day,
-          dateStr: dateStr,
-          isPast: isPast,
-          status: status,
-          td: td,
-          cell: cell,
-          stateNode: stateEl,
-          holidayName: holidayName,
+      if (isAdmin && !isPast) {
+        dayEl.addEventListener('click', function () {
+          toggleDateStatus(dateStr).catch(function (error) {
+            console.error(error);
+          });
         });
       }
 
+      td.appendChild(dayEl);
       return td;
     }
 
-    function render() {
-      var months = getVisibleMonths();
-      calendarsContainer.innerHTML = '';
+    function buildEmptyCell() {
+      var td = document.createElement('td');
+      var dayEl = document.createElement('div');
+      dayEl.className = 'calendar-day empty';
+      td.appendChild(dayEl);
+      return td;
+    }
 
-      months.forEach(function (month) {
-        var wrapper = document.createElement('section');
-        var header = document.createElement('div');
-        var title = document.createElement('h2');
-        var counts = document.createElement('div');
-        var table = document.createElement('table');
-        var thead = document.createElement('thead');
-        var tbody = document.createElement('tbody');
-        var firstDay = new Date(month.y, month.m - 1, 1).getDay();
-        var days = monthDays(month.y, month.m);
-        var row = document.createElement('tr');
+    function renderMonth(month) {
+      var year = month.year;
+      var monthNumber = month.month;
+      var card = document.createElement('section');
+      var head = document.createElement('div');
+      var title = document.createElement('h2');
+      var table = document.createElement('table');
+      var thead = document.createElement('thead');
+      var tbody = document.createElement('tbody');
+      var headRow = document.createElement('tr');
+      var firstWeekday = new Date(year, monthNumber - 1, 1).getDay();
+      var totalDays = new Date(year, monthNumber, 0).getDate();
+      var dayCounter = 1;
+      var rowIndex;
+      var columnIndex;
 
-        wrapper.className = 'calendar-card';
-        header.className = 'calendar-head';
-        title.className = 'calendar-title';
-        counts.className = 'month-counts';
-        title.textContent = month.y + ' 年 ' + month.m + ' 月';
-        counts.textContent = showMonthSummary
-          ? monthSummaryFormatter(getMonthSummary(month.y, month.m))
-          : '';
-        if (!showMonthSummary) {
-          counts.style.display = 'none';
-        }
-        header.appendChild(title);
-        header.appendChild(counts);
-        wrapper.appendChild(header);
+      card.className = 'calendar-card';
 
-        table.className = 'calendar-table';
-        thead.innerHTML =
-          '<tr>' +
-          WEEKDAY_LABELS.map(function (label) {
-            return '<th scope="col">' + label + '</th>';
-          }).join('') +
-          '</tr>';
-        table.appendChild(thead);
+      head.className = 'calendar-head';
+      title.className = 'calendar-title';
+      title.textContent = year + ' 年 ' + monthNumber + ' 月';
+      head.appendChild(title);
 
-        for (var gap = 0; gap < firstDay; gap += 1) {
-          var emptyTd = document.createElement('td');
-          var emptyCell = document.createElement('div');
-          emptyCell.className = 'calendar-day empty';
-          emptyTd.appendChild(emptyCell);
-          row.appendChild(emptyTd);
-        }
+      if (showMonthSummary) {
+        var monthCounts = document.createElement('div');
+        monthCounts.className = 'month-counts';
+        monthCounts.textContent = monthSummaryFormatter(
+          getMonthSummary(year, monthNumber)
+        );
+        head.appendChild(monthCounts);
+      }
 
-        days.forEach(function (day) {
-          row.appendChild(buildDayCell(month.y, month.m, day));
-          if ((firstDay + day) % 7 === 0) {
-            tbody.appendChild(row);
-            row = document.createElement('tr');
-          }
-        });
+      card.appendChild(head);
 
-        if (row.children.length > 0) {
-          while (row.children.length < 7) {
-            var tailTd = document.createElement('td');
-            var tailCell = document.createElement('div');
-            tailCell.className = 'calendar-day empty';
-            tailTd.appendChild(tailCell);
-            row.appendChild(tailTd);
-          }
-          tbody.appendChild(row);
-        }
-
-        while (tbody.children.length < 6) {
-          var extraRow = document.createElement('tr');
-          for (var emptyIndex = 0; emptyIndex < 7; emptyIndex += 1) {
-            var extraTd = document.createElement('td');
-            var extraCell = document.createElement('div');
-            extraCell.className = 'calendar-day empty';
-            extraTd.appendChild(extraCell);
-            extraRow.appendChild(extraTd);
-          }
-          tbody.appendChild(extraRow);
-        }
-
-        table.appendChild(tbody);
-        wrapper.appendChild(table);
-        calendarsContainer.appendChild(wrapper);
+      table.className = 'calendar-table';
+      WEEKDAY_LABELS.forEach(function (label) {
+        var th = document.createElement('th');
+        th.scope = 'col';
+        th.textContent = label;
+        headRow.appendChild(th);
       });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
 
+      for (rowIndex = 0; rowIndex < 6; rowIndex += 1) {
+        var row = document.createElement('tr');
+        for (columnIndex = 0; columnIndex < 7; columnIndex += 1) {
+          if ((rowIndex === 0 && columnIndex < firstWeekday) || dayCounter > totalDays) {
+            row.appendChild(buildEmptyCell());
+            continue;
+          }
+
+          row.appendChild(
+            buildDayCell(
+              year,
+              monthNumber,
+              dayCounter,
+              firstWeekday,
+              ymd(year, monthNumber, dayCounter)
+            )
+          );
+          dayCounter += 1;
+        }
+        tbody.appendChild(row);
+      }
+
+      table.appendChild(tbody);
+      card.appendChild(table);
+      return card;
+    }
+
+    function render() {
+      var fragment = document.createDocumentFragment();
+
+      calendarsContainer.innerHTML = '';
+      getVisibleMonths().forEach(function (month) {
+        fragment.appendChild(renderMonth(month));
+      });
+      calendarsContainer.appendChild(fragment);
       summarizeVisibleMonths();
+
+      if (onRenderComplete) {
+        onRenderComplete(api);
+      }
     }
 
     async function reload() {
-      updateSyncText('正在同步資料...');
-      await ensureYearsLoaded();
+      updateElementText(lastSyncEl, '同步中');
+      await ensureVisibleData();
       render();
-      updateSyncText(
-        '已於 ' +
-          new Date().toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          }) +
-          ' 更新'
-      );
+      return api;
     }
 
-    function goToday() {
-      var now = new Date();
-      monthInput.value =
-        now.getFullYear() +
-        '-' +
-        String(now.getMonth() + 1).padStart(2, '0');
-      clampMonthInput();
+    async function toggleDateStatus(dateStr) {
+      var year = parseInt(dateStr.slice(0, 4), 10);
+      var previous = getStatusForDate(dateStr);
+      var next = previous === 'full' ? 'free' : 'full';
+      var yearCache = stateCache[year] || {};
+      var hadPrevious = Object.prototype.hasOwnProperty.call(yearCache, dateStr);
+
+      stateCache[year] = yearCache;
+      yearCache[dateStr] = next;
+      render();
+      updateElementText(lastSyncEl, '儲存中');
+
+      try {
+        var payload = await patch(year, (function () {
+          var delta = {};
+          delta[dateStr] = next;
+          return delta;
+        })());
+        if (onStateUpdated) {
+          onStateUpdated({
+            date: dateStr,
+            year: year,
+            previous: previous,
+            current: next,
+            response: payload,
+          });
+        }
+      } catch (error) {
+        if (hadPrevious) {
+          yearCache[dateStr] = previous;
+        } else {
+          delete yearCache[dateStr];
+        }
+        render();
+        updateElementText(lastSyncEl, '更新失敗');
+        alert('更新失敗，已還原剛剛的操作。');
+      }
     }
 
-    function shiftMonths(delta) {
-      var current = getMonthRange();
-      var nextDate = new Date(current.y, current.m - 1 + delta, 1);
-      monthInput.value =
-        nextDate.getFullYear() +
-        '-' +
-        String(nextDate.getMonth() + 1).padStart(2, '0');
-      clampMonthInput();
-    }
+    ensureMonthRange();
 
-    function canShiftMonths(delta) {
-      var current = getMonthRange();
-      var target = new Date(current.y, current.m - 1 + delta, 1);
-      return target >= getMinDate() && target <= getMaxDate();
-    }
-
-    initSelectors();
-
-    return {
-      reload: reload,
-      render: render,
-      goToday: goToday,
-      shiftMonths: shiftMonths,
-      canShiftMonths: canShiftMonths,
-      monthDays: monthDays,
-      ymd: ymd,
+    var api = {
+      cache: stateCache,
       todayStr: todayStr,
+      ymd: ymd,
+      monthDays: monthDays,
       getStartYM: function () {
-        var current = getMonthRange();
-        return [current.y, current.m];
+        var start = getStartYM();
+        return [start.year, start.month];
       },
-      get cache() {
-        return stateCache;
-      },
-      get holidays() {
-        return holidayCache;
-      },
-      patch: adminToken ? apiPatch : null,
+      canShiftMonths: canShiftMonths,
+      shiftMonths: shiftMonths,
+      goToday: goToday,
+      render: render,
+      reload: reload,
+      patch: patch,
     };
+
+    return api;
   }
 
-  global.RoomCalendar = { create: createCalendar };
+  global.RoomCalendar = {
+    create: createCalendar,
+    createHolidayLoader: createHolidayLoader,
+  };
 })(window);

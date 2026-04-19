@@ -335,8 +335,12 @@ button {
 
 .button:disabled,
 button:disabled {
-  cursor: wait;
-  opacity: 0.74;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  opacity: 0.42;
+  filter: saturate(0.35);
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .button:hover,

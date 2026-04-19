@@ -1,42 +1,33 @@
 const API_BASE_PUBLIC =
   'https://script.google.com/macros/s/AKfycbyX3WVu_DLrx0gRehHButc0fjsjqRuS23UAjOPZWhy9nOt-cYOxIgMCLUu-OcV1n15f8g/exec';
 
-const holidayAliases = [
+const ADMIN_SYNC_KEY = 'room-admin-sync';
+const PUBLIC_REFRESH_MS = 60 * 1000;
+const HOLIDAY_ALIASES = [
   ['中華民國開國紀念日', '元旦'],
   ['和平紀念日', '228'],
-  ['兒童節及民族掃墓節', '兒童/清明'],
-  ['民族掃墓節', '清明'],
-  ['勞動節', '勞動'],
+  ['兒童節及民族掃墓節', '兒童節'],
+  ['民族掃墓節', '清明節'],
   ['端午節', '端午'],
   ['中秋節', '中秋'],
+  ['國慶日', '國慶'],
   ['農曆除夕', '除夕'],
   ['春節', '春節'],
 ];
 
 function normalizeHolidayName(name) {
-  for (const entry of holidayAliases) {
-    if (name.includes(entry[0])) return entry[1];
+  for (const [source, target] of HOLIDAY_ALIASES) {
+    if (name.includes(source)) {
+      return target;
+    }
   }
   return name.replace(/\s+/g, '').slice(0, 8);
 }
 
-async function loadTaiwanHolidays(year) {
-  const url = `https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/${year}.json`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`holiday fetch failed: ${res.status}`);
-  }
-
-  const list = await res.json();
-  const out = {};
-  list.forEach((item) => {
-    if (!item.isHoliday || !item.description) return;
-    const d = item.date;
-    const dateStr = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
-    out[dateStr] = normalizeHolidayName(item.description);
-  });
-  return out;
-}
+const loadTaiwanHolidays = RoomCalendar.createHolidayLoader({
+  cachePrefix: 'room-holidays-',
+  normalize: normalizeHolidayName,
+});
 
 const publicPage = {
   monthInput: document.getElementById('startMonth'),
@@ -55,9 +46,10 @@ const publicCalendar = RoomCalendar.create({
   lastSyncEl: publicPage.lastSync,
   viewSpanMonths: 3,
   showMonthSummary: false,
-  contactPhone: document.body.dataset.phone || '0905385388',
   holidayLoader: loadTaiwanHolidays,
 });
+
+let isReloadingPublic = false;
 
 function syncPublicNavState() {
   if (publicPage.btnPrev) {
@@ -68,47 +60,60 @@ function syncPublicNavState() {
   }
 }
 
-async function reloadPublicCalendar({ goToday = false } = {}) {
-  const btn = publicPage.btnReload;
+async function reloadPublicCalendar(options = {}) {
+  const { goToday = false, silent = false } = options;
+  if (isReloadingPublic) return;
+
+  isReloadingPublic = true;
 
   try {
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = '同步中...';
-    }
     if (goToday) {
       publicCalendar.goToday();
     }
+
+    if (!silent && publicPage.btnReload) {
+      publicPage.btnReload.disabled = true;
+      publicPage.btnReload.textContent = '同步中';
+    }
+
     syncPublicNavState();
     await publicCalendar.reload();
   } catch (error) {
     console.error(error);
-    alert('資料同步失敗，請稍後再試。');
+    if (!silent) {
+      alert('重新載入失敗，請稍後再試。');
+    }
     if (publicPage.lastSync) {
       publicPage.lastSync.textContent = '同步失敗';
     }
   } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '回到本月';
+    if (!silent && publicPage.btnReload) {
+      publicPage.btnReload.disabled = false;
+      publicPage.btnReload.textContent = '回到本月';
     }
     syncPublicNavState();
+    isReloadingPublic = false;
   }
 }
 
 publicPage.btnReload.addEventListener('click', () =>
   reloadPublicCalendar({ goToday: true })
 );
+
 publicPage.btnPrev.addEventListener('click', () => {
+  if (!publicCalendar.canShiftMonths(-3)) return;
   publicCalendar.shiftMonths(-3);
   syncPublicNavState();
   reloadPublicCalendar();
 });
+
 publicPage.btnNext.addEventListener('click', () => {
+  if (!publicCalendar.canShiftMonths(3)) return;
   publicCalendar.shiftMonths(3);
   syncPublicNavState();
   reloadPublicCalendar();
 });
+
 publicPage.monthInput.addEventListener('change', () => {
   syncPublicNavState();
   reloadPublicCalendar();
@@ -125,4 +130,25 @@ if (publicPage.btnTop) {
   });
 }
 
+window.addEventListener('storage', (event) => {
+  if (event.key !== ADMIN_SYNC_KEY || !event.newValue) return;
+  reloadPublicCalendar({ silent: true });
+});
+
+if ('BroadcastChannel' in window) {
+  const channel = new BroadcastChannel('room-calendar-sync');
+  channel.addEventListener('message', (event) => {
+    if (event.data === 'refresh-public') {
+      reloadPublicCalendar({ silent: true });
+    }
+  });
+}
+
+setInterval(() => {
+  if (document.visibilityState === 'visible') {
+    reloadPublicCalendar({ silent: true });
+  }
+}, PUBLIC_REFRESH_MS);
+
+syncPublicNavState();
 reloadPublicCalendar({ goToday: true });
